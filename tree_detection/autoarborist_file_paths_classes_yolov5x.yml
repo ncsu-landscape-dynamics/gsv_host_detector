@@ -1,0 +1,15 @@
+# Example usage: python train.py --data coco128.yaml
+# parent
+# ├── yolov5
+# └── datasets
+#     └── coco128  ← downloads here (7 MB)
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: ./datasets/autoarborist_googlestreetview_images_labels_7300ailanthus_22000trees_jan324  # dataset root dir
+train: train/images  # train images (relative to 'path') images
+val: test/images  # val images (relative to 'path') images
+
+# Classes
+names:
+  0: tree
+  1: ailanthus

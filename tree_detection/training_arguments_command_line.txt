@@ -1,0 +1,32 @@
+# Command-line options for training YOLO models with different args
+
+# Train from scratch with imagenet weights and --image-weights sampling
+
+see: https://github.com/ultralytics/yolov5/issues/1238
+see also: https://github.com/ultralytics/yolov5/discussions/5604
+
+
+# Train X-size Model
+python train.py --img 768 --batch -1 --epochs 10 --image-weights --data ./datasets/autoarborist_file_paths_classes_yolov5x.yml --cfg ./datasets/autoarborist_architecture_yolov5x.yml --weights yolov5x.pt --hyp ./datasets/hyp-scratch-custom.yaml
+
+
+# Train M-size Model with larger training image size 
+python train.py --img 768 --batch -1 --epochs 10 --image-weights --data ./datasets/autoarborist_file_paths_classes_yolov5m.yml --cfg ./datasets/autoarborist_architecture_yolov5m.yml --weights yolov5m.pt --hyp ./datasets/hyp-scratch-custom.yaml
+
+
+# Retrain from a pre-trained model with Yolov5x weights
+
+python train.py --rect --batch -1 --epochs 20 --image-weights --data ./datasets/autoarborist_file_paths_classes_yolov5x.yml --cfg ./datasets/autoarborist_architecture_yolov5x.yml --weights C:/Users/talake2/Desktop/auto_arborist_cvpr2022_v015/yolov5/runs/train/exp-autoarb-with-ailanthus-3600imgstrain-5ktrees-CLpt1-easy-yolov5x-imagenet-10epochs-lowaug-imgweights-lr01-dec1123/weights/last.pt --hyp ./datasets/hyp-scratch-custom.yaml
+
+
+# Retrain from a pre-trained model weights with frozen backbone
+
+python train.py --rect --batch -1 --epochs 30 --image-weights --freeze 10 --data ./datasets/autoarborist_file_paths_classes_yolov5x.yml --cfg ./datasets/autoarborist_architecture_yolov5x.yml --weights C:/Users/talake2/Desktop/auto_arborist_cvpr2022_v015/yolov5/runs/train/yolov5x-oct2323-autoarborist-25epochs/weights/last.pt --hyp ./datasets/hyp-scratch-custom.yaml
+
+
+# Detect on new images and visualize model features
+
+python detect.py --weights C:/Users/talake2/Desktop/auto_arborist_cvpr2022_v015/yolov5/runs/train/exp5/weights/last.pt --source=C:/Users/talake2/Desktop/GSV_panoramic_images/GSV_imgs_ailanthus/r2048/_3DIEb8MnUP0LRYicY3dmQ.jpg
+
+
+
