@@ -1,1 +1,1 @@
-Repo for tree speices classification. 
+Repo for tree species classification. 
