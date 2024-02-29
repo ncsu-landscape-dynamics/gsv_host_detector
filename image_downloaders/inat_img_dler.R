@@ -180,4 +180,4 @@ lapply(classes, function(x) {
 #' To do:
 #' 1. Update 4. to check if images already exist in the folder if they do,
 #' skip download, if not, download.
-#' 2. Convert script into markdown file
+#' 2. Convert script into markdown file (or python script if gsv_detector converted into pkg)
