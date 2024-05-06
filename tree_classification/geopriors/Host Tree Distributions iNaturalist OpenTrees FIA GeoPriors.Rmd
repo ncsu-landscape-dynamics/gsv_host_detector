@@ -1,0 +1,2117 @@
+---
+title: "Host Tree Genera Distribution Analysis: OpenTrees/AutoArborist, iNat, FIA "
+author: "Thomas Lake"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: TRUE
+    theme: united
+    highlight: tango
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r libraries, echo=FALSE}
+
+# R version 4.1.3
+library(data.table)
+library(terra)
+library(raster)
+library(rasterVis)
+library(viridis)
+library(maps)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(plotly)
+library(ggdendro)
+library(gridExtra)
+
+
+```
+
+
+
+```{r Root Folder, include=FALSE, echo=FALSE}
+
+# Root folder of Autoarborist observations
+autoarboristPath <- "Z:/auto_arborist_cvpr2022_v0.15/data/autoarborist_original_data/autoarborist_original_records_csv"
+
+# Root folder of iNaturalist observations 
+#inatPath <- "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/inat/metadata"
+inatPath <- "D:/inat/metadata"
+
+# Root folder of openTrees observations https://opentrees.org/
+openTreesPath <- "Z:/auto_arborist_cvpr2022_v0.15/data/opentrees"
+
+# Root folder of USFS Forest Inventory and Analysis program in the US
+#fiaPath <- "Z:/auto_arborist_cvpr2022_v0.15/data/CSV_FIADB_ENTIRE/"
+fiaPath <- "C:/Users/talake2/Downloads/CSV_FIADB_ENTIRE"
+
+# Root folder of USFS Urban Forest Inventory and Analysis program in the US
+#fiaUrbanPath <- "Z:/auto_arborist_cvpr2022_v0.15/data/FIADB_URBAN_ENTIRE_CSV"
+fiaUrbanPath <- "C:/Users/talake2/Downloads/FIADB_URBAN_ENTIRE_CSV"
+
+```
+
+
+
+## Host Tree Genera Geographic Distribution Shifts {.tabset .tabset-pills}
+
+This R markdown summarizes the geographic distribution of different host tree genera using occurrence data from AutoArborist, OpenTrees, iNaturalist, and the USFS Forest Inventory and Analysis (FIA) dataset.
+
+Understanding the distribution and relative abundance of host tree genera across the US may be informative as priors to improve image classification of tree genera.
+
+**Analyses Questions**
+
+1. What are the observed geographic distributions of tree genera in the United States?
+
+2. How do different data sources (AutoArborist, OpenTrees, iNaturalist, FIA) vary in their characterization of tree genera distributions? Do urban trees genera have a different relative abundance than in natural settings?
+
+3. How can we characterize geographic distribution shifts in tree genera to potentially improve image classification?
+
+
+
+
+
+### Distribution Shifts {.tabset}
+
+The AutoArborist Dataset (Beery et al., 2022) describe the importance of distribution shifts in tree genera on the accuracy of tree genera classification using CNNs.
+
+**"One of our primary challenges is to be able to do well on novel cities that were not part of the training set, but in order for a model to do so, it will have to contend with distribution shift, where the training distribution of cities differs from the novel test distribution on some new city."**
+
+Label shift refers to when the marginal distribution of labels (genera) differs from city to city even if the appearance of an image does not change. This simply means that species distributions vary geographically (e.g., we tend to see Palm trees in Southern California and less in Canada).
+
+Figure 4 visualizes the distribution shift between pairs of cities using the L1 norm distance between normalized genus distributions.
+
+![](Z:/auto_arborist_cvpr2022_v0.15/data/autoarborist_original_data/summary_autoarborist_data_analyses/Autoarborist_Fig4_DistributionShifts.png)
+
+
+#### Label Shift vs Accuracy
+
+**There is a strong correlation between distribution similarity and performance, notably models can achieve the same accuracy with significantly less training data if their distributions are similar.**
+
+Put simply, tree genus classification accuracy declines when the distribution of genera differ between training and testing.
+
+![](Z:/auto_arborist_cvpr2022_v0.15/data/autoarborist_original_data/summary_autoarborist_data_analyses/Autoarborist_SupFig1_Distribution_Accuracy.png)
+
+#### L1 Norm
+
+The authors use the L1 norm to describe the distribution shifts between cities with different tree genera.
+
+The L1 norm, also known as the Manhattan distance, between two vectors \( \mathbf{u} \) and \( \mathbf{v} \) is calculated as:
+
+\[
+||\mathbf{u} - \mathbf{v}||_1 = \sum_{i=1}^{n} |u_i - v_i|
+\]
+
+where \( n \) is the dimensionality of the vectors.
+
+
+
+```{r, echo=FALSE}
+
+print("Example: The distribution of tree genera in city 1 (vector1) and city 2 (vector2) can be compared using the L1 norm.")
+
+# Define two vectors of tree genera
+vector1 <- c(1, 2, 3, 4, 5, 4, 3, 2, 1, 2, 1)
+print("Count of tree genera in city 1:")
+print(vector1)
+
+vector2 <- c(8, 7, 7, 2, 3, 1, 2, 0, 2, 1, 2)
+print("Count of tree genera in city 2:")
+print(vector2)
+
+# Calculate L1 distance
+l1_distance <- sum(abs(vector1 - vector2))
+
+print(paste("L1 distance between vector1 and vector2:", l1_distance))
+
+
+
+```
+
+
+
+
+### AutoArborist Observations {.tabset}
+
+```{r, echo=FALSE}
+
+autoarbObs <- fread(paste0(autoarboristPath, "/tfrecords_locs_all.csv"))
+
+# Rename columns
+colnames(autoarbObs)[which(names(autoarbObs) == "Longitude")] <- "longitude"
+colnames(autoarbObs)[which(names(autoarbObs) == "Latitude")] <- "latitude"
+
+# Filter out rows with missing latitude or longitude data
+autoarbObs <- autoarbObs[complete.cases(autoarbObs$longitude, autoarbObs$latitude), ]
+
+# Subset observations to North America
+autoarbObs_NA <- autoarbObs[
+  longitude >= -140 & longitude <= -55 &
+  latitude >= 20 & latitude <= 60
+]
+
+# Convert autoarbObs_NA$Genus into a tibble
+autoarbObs_NA_genus <- tibble(genus = unique(autoarbObs_NA$Genus))
+
+paste("There are ", length(unique(autoarbObs_NA$City)), "cities sampled in Autoarborist.")
+
+paste("There are ", length(unique(autoarbObs_NA$Genus)), " tree genera sampled from Autoarborist.")
+
+paste("There are ", NROW(autoarbObs_NA), " tree genera records sampled from Autoarborist.")
+
+
+```
+
+```{r, echo=FALSE}
+
+# Randomly sample a point per source city
+autoarb_sampled_data <- autoarbObs_NA %>%
+  group_by(City) %>%
+  sample_n(1, replace = FALSE)
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-125, -65),  ylim = c(25, 60), ratio=1.3) + 
+  geom_point(data = autoarb_sampled_data, aes(x = longitude, y = latitude)) +
+  geom_text(data = autoarb_sampled_data, aes(x = longitude, y = latitude, label = City), vjust = 1.5, size=2) +  # Add labels
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Distribution of Sampled Cities from Autoarborist.")
+
+
+ggplotly(p)
+
+```
+
+
+#### Examine Autoarborist Data
+
+
+```{r, echo=FALSE}
+
+# Subset observations to North America
+autoarbObs_NA_siouxfalls <- autoarbObs_NA %>%
+  filter(City == "SiouxFalls")
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+print("Example City: Sioux Falls, SD")
+
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-96.9, -96.65),  ylim = c(43.45, 43.6), ratio=1.3) + 
+  geom_point(data = autoarbObs_NA_siouxfalls, aes(x = longitude, y = latitude, color = Genus), size = 2, alpha=0.7) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Trees in Sioux Falls (AutoArborist)")
+
+print(p)
+
+
+
+```
+
+#### Autoarborist Total Genera
+
+```{r, echo=FALSE}
+
+# Count the number of instances of each genus
+genus_counts_autoarb <- table(autoarbObs_NA$Genus)
+# Sort the table in descending order
+genus_counts_autoarb <- sort(genus_counts_autoarb, decreasing = TRUE)
+
+# Print out the summary
+head(genus_counts_autoarb, n=20)
+
+# Barplot: Count of top-50 genera from Autoarborist
+genus_counts_autoarb_df <- data.frame(genus = names(genus_counts_autoarb), count = as.numeric(genus_counts_autoarb))
+
+top_50_genera_autoarb <- head(genus_counts_autoarb_df[order(-genus_counts_autoarb_df$count), ], 50)
+
+ggplot(top_50_genera_autoarb, aes(x = reorder(genus, -count), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Count", title = "Distribution of Tree Genera in AutoArborist Dataset") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+```
+
+
+
+#### Autoarborist Genus Counts Per City
+
+```{r, echo=FALSE}
+
+print("Abundance of tree genera in cities of North America from OpenTrees")
+
+# Count the number of occurrences of each genus for each city 'source'
+genus_counts_by_source_aa <- autoarbObs_NA %>%
+  group_by(Genus, City) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# Get the top 50 genera for each city 'source'
+top_50_genera_by_source_aa <- genus_counts_by_source_aa %>%
+  group_by(City) %>%
+  top_n(50, count) %>%
+  arrange(City, desc(count))
+
+# Path to save the PDFs
+#pdf_path <- "Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/geopriors/Tree_Genera_Distributions/autoarborist"
+
+# Iterate over each source city
+for (city in unique(top_50_genera_by_source_aa$City)) {
+  # Create the plot for the specific city source
+  plot <- ggplot(top_50_genera_by_source_aa %>% filter(City == city), aes(x = reorder(Genus, -count), y = count)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Genus", y = "Count", title = paste("Distribution of Genera in", city)) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  
+  print(plot)
+  
+  # Save the plot as a PDF
+  #pdf_file <- paste0(pdf_path, "Distribution_of_Genera_in_", gsub(" ", "_", city), ".pdf")
+  #ggsave(filename = pdf_file, plot = plot, device = "pdf", width = 8, height = 6)
+}
+
+
+
+```
+
+
+
+#### Normalized Per-Genus Counts Autoarborist
+
+```{r, echo=FALSE}
+
+print("We compare tree genera between cities by first normalizing the number of tree genera counts. For cities with no tree genera present, we set that count to zero.")
+
+# Calculate the L1 distance between the normalized per-genus count vectors for each city
+
+# Group data by city and calculate total counts for each city for per-genus count normalization
+# Total count of trees per city
+city_totals_aa <- genus_counts_by_source_aa %>%
+  group_by(City) %>%
+  summarise(total_count = sum(count))
+
+# Join the total counts with the original data and calculate normalized counts
+# Normalized counts per genus and per city
+aa_normalized_counts_data <- genus_counts_by_source_aa %>%
+  left_join(city_totals_aa, by = "City") %>%
+  mutate(normalized_count = count / total_count) %>%
+  select(-total_count)
+
+# Store normalized counts vector in list
+aa_normalized_counts_list <- list()
+
+# Create a dataframe containing all cities
+all_cities_aa <- data.frame(City = unique(genus_counts_by_source_aa$City))
+
+# Loop over each genus and calculate normalized counts 
+for (genus in unique(genus_counts_by_source_aa$Genus)) {
+  
+  # Get normalized per-genus counts for cities
+  genus_normalized <- aa_normalized_counts_data %>%
+    filter(Genus == genus) %>%
+    select(City, normalized_count)
+  
+  genus_normalized_all <- left_join(all_cities_aa, genus_normalized, by = "City")
+  
+  # For cities where a genus is not observed, set the normalized count to 0
+  genus_normalized_all$normalized_count[is.na(genus_normalized_all$normalized_count)] <- 0
+  
+  # Combine results in list for each genus
+  aa_normalized_counts_list[[genus]] <- genus_normalized_all
+  
+}
+
+# Extract normalized counts for all genera
+aa_normalized_counts_all <- lapply(aa_normalized_counts_list, `[[`, "normalized_count")
+
+# Combine normalized count dataframes for all genera
+aa_combined_normalized_counts <- do.call(cbind, c(list(aa_normalized_counts_list[[1]]$City), aa_normalized_counts_all))
+
+combined_normalized_counts_aa <- as.data.frame(aa_combined_normalized_counts)
+
+# Rename the first column to "City"
+names(combined_normalized_counts_aa)[1] <- "City"
+
+print("The first ten cities and ten genera normalized per city.")
+
+print(combined_normalized_counts_aa[1:10, 1:10])
+
+
+```
+
+
+#### L1 and L2 Norm Per City Autoarborist
+
+
+```{r, echo=FALSE}
+
+print("We can calculate and compare the L1 norm distance of tree genera counts between cities.")
+
+# Get the number of rows (cities) in Autoarborist data
+num_cities <- nrow(combined_normalized_counts_aa)
+
+# Initialize a matrix to store pairwise L1 distances
+l1_distances <- matrix(0, nrow = num_cities, ncol = num_cities)
+l2_distances <- matrix(0, nrow = num_cities, ncol = num_cities)
+
+# Iterate over each pair of cities
+for (i in 1:num_cities) {
+  for (j in 1:num_cities) {
+    # Extract normalized count vectors for the two cities
+    city1_vector <- as.numeric(combined_normalized_counts_aa[i, -1])
+    city2_vector <- as.numeric(combined_normalized_counts_aa[j, -1])
+    
+    # Calculate L1 distance between the two cities and store it in the matrix
+    l1_distances[i, j] <- sum(abs(city1_vector - city2_vector))
+    l2_distances[i, j] <- sqrt(sum((city1_vector - city2_vector)^2))
+  }
+}
+
+# Rename L1 and L2 matrices columns and rows by city name
+rownames(l1_distances) <- combined_normalized_counts_aa$City
+colnames(l1_distances) <- combined_normalized_counts_aa$City
+rownames(l2_distances) <- combined_normalized_counts_aa$City
+colnames(l2_distances) <- combined_normalized_counts_aa$City
+
+# Convert the matrix to a long format dataframe for plotting
+l1_distances_df <- melt(as.matrix(l1_distances))
+l2_distances_df <- melt(as.matrix(l2_distances))
+
+
+
+print("L1 distances of tree genera between cities shown using a dendrogram.")
+print("Cities with similar distributions of tree genera cluster compared to dissimilar distributions.")
+
+hc <- hclust(dist(l1_distances))
+p <- ggdendrogram(hc, rotate=TRUE, size=1) + ggtitle("Distance (L1) of tree genera distributions between cities")
+plot(p)
+
+
+# Regional groupings from Autoarborist
+city_order <- c("Vancouver", "Surrey", "Seattle", "SanFrancisco", "SanJose", "Cupertino", "SantaMonica", "LosAngeles", "Boulder", "Denver", "SiouxFalls", "Calgary", "Edmonton", "WashingtonDc", "Charlottesville", "Pittsburgh", "Montreal", "NewYork", "Buffalo", "Kitchener", "Cambridge", "Columbus", "Bloomington")
+
+# Convert Var1 and Var2 to factors with specified levels
+l1_distances_df$Var1 <- factor(l1_distances_df$Var1, levels = city_order)
+l1_distances_df$Var2 <- factor(l1_distances_df$Var2, levels = city_order)
+l2_distances_df$Var1 <- factor(l2_distances_df$Var1, levels = city_order)
+l2_distances_df$Var2 <- factor(l2_distances_df$Var2, levels = city_order)
+
+print("The L1 norm calculated between cities shows patterns of similar and dissimilar tree genera.")
+print("L1 norm considers the absolute differences between two vectors.")
+
+# Plot L1 Distances Matrix as Heatmap
+ggplot(l1_distances_df, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_viridis_c() + # Viridis color palette
+  labs(title = "Pairwise L1 Norm Distances Between Cities",
+       x = "City", y = "City") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+print("L2 norm considers both the magnitude and direction of differences between two vectors")
+
+# Plot L1 Distances Matrix as Heatmap
+ggplot(l2_distances_df, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_viridis_c() + # Viridis color palette
+  labs(title = "Pairwise L2 Norm Distances Between Cities",
+       x = "City", y = "City") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+
+```
+
+
+
+
+
+
+### OpenTrees Observations {.tabset}
+
+```{r, echo=FALSE}
+
+# Load openTrees observation data from US and CAN
+openTreesObs <- fread(paste0(openTreesPath, "/opentrees.csv"))
+
+# Rename columns
+colnames(openTreesObs)[which(names(openTreesObs) == "X")] <- "longitude"
+colnames(openTreesObs)[which(names(openTreesObs) == "Y")] <- "latitude"
+
+# Filter out rows with missing latitude or longitude data
+openTreesObs <- openTreesObs[complete.cases(openTreesObs$longitude, openTreesObs$latitude), ]
+
+# Filter out source city 'monterrey_mx'
+openTreesObs <- subset(openTreesObs, source != 'monterrey_mx')
+
+# Subset observations to North America
+openTreesObs_NA <- openTreesObs[
+  longitude >= -140 & longitude <= -55 &
+  latitude >= 25 & latitude <= 60
+]
+
+# Convert genus column to lowercase
+openTreesObs_NA$genus <- tolower(openTreesObs_NA$genus)
+
+# Filter openTreesObs_NA to include only records where genus is found in unique_genera
+openTreesObs_NA_filtered <- openTreesObs_NA[openTreesObs_NA$genus %in% unique(autoarbObs_NA$Genus), ]
+
+# Convert to spatialpoints dataframe
+#coordinates(openTreesObs_NA_filtered) <- ~longitude+latitude
+
+paste("There are ", length(unique(openTreesObs_NA_filtered$genus)), " tree genera sampled from Open Trees.")
+
+paste("There are ", NROW(openTreesObs_NA_filtered), " tree genera records sampled from Open Trees.")
+
+paste("There are ", length(unique(openTreesObs_NA_filtered$source)), " cities sampled by Open Trees.")
+
+
+
+```
+
+
+
+```{r, echo=FALSE}
+
+# Randomly sample a point per source city
+opentrees_sampled_data <- openTreesObs_NA_filtered %>%
+  group_by(source) %>%
+  sample_n(1, replace = FALSE)
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-125, -65),  ylim = c(25, 60), ratio=1.3) + 
+  geom_point(data = opentrees_sampled_data, aes(x = longitude, y = latitude)) +
+  geom_text(data = opentrees_sampled_data, aes(x = longitude, y = latitude, label = source), vjust = 1.5, size=3) +  # Add labels
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Distribution of Sampled Cities from OpenTrees Across US/CAN")
+
+ggplotly(p)
+
+#ggsave(filename = "C:/users/talake2/desktop/opentrees_locations.pdf", plot = p, device = "pdf", width = 12, height = 12)
+
+
+```
+
+
+#### OpenTrees Total Genera
+
+
+```{r, echo=FALSE}
+
+print("The total count and distribution of tree genera sampled from OpenTrees across 70 cities.")
+
+# Count the number of instances of each genus
+genus_counts_opentrees <- table(openTreesObs_NA_filtered$genus)
+# Sort the table in descending order
+genus_counts_opentrees <- sort(genus_counts_opentrees, decreasing = TRUE)
+# Print out the summary
+head(genus_counts_opentrees, n=20)
+
+# Barplot: Count of top-50 genera from OpenTrees
+genus_counts_opentrees_df <- data.frame(genus = names(genus_counts_opentrees), count = as.numeric(genus_counts_opentrees))
+
+top_50_genera_opentrees <- head(genus_counts_opentrees_df[order(-genus_counts_opentrees_df$count), ], 50)
+
+ggplot(top_50_genera_opentrees, aes(x = reorder(genus, -count), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Count", title = "Distribution of Genera in OpenTrees") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+```
+
+
+
+#### OpenTrees Genus Counts Per City
+
+```{r, echo=FALSE}
+
+print("Abundance of tree genera in cities of North America from OpenTrees")
+
+# Count the number of occurrences of each genus for each city 'source'
+genus_counts_by_source_ot <- openTreesObs_NA_filtered %>%
+  group_by(genus, source) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# Get the top 50 genera for each city 'source'
+top_50_genera_by_source_ot <- genus_counts_by_source_ot %>%
+  group_by(source) %>%
+  top_n(50, count) %>%
+  arrange(source, desc(count))
+
+
+# Path to save the PDFs
+#pdf_path <- "Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/geopriors/Tree_Genera_Distributions/opentrees/"
+
+# Iterate over each source city
+for (city in unique(top_50_genera_by_source_ot$source)) {
+  # Create the plot for the specific city source
+  plot <- ggplot(top_50_genera_by_source_ot %>% filter(source == city), aes(x = reorder(genus, -count), y = count)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Genus", y = "Count", title = paste("Distribution of Genera in", city)) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  
+  print(plot)
+  
+  # Save the plot as a PDF
+  #pdf_file <- paste0(pdf_path, "Distribution_of_Genera_in_", gsub(" ", "_", city), ".pdf")
+  #ggsave(filename = pdf_file, plot = plot, device = "pdf", width = 8, height = 6)
+}
+
+
+
+
+```
+
+
+#### Normalized Per-Genus Counts OpenTrees
+
+```{r, echo=FALSE}
+
+
+print("We compare tree genera between cities by first normalizing the number of tree genera counts. For cities with no tree genera present, we set that count to zero.")
+
+# Calculate the L1 distance between the normalized per-genus count vectors for each city
+
+# Group data by city and calculate total counts for each city for per-genus count normalization
+# Total count of trees per city
+city_totals_ot <- genus_counts_by_source_ot %>%
+  group_by(source) %>%
+  summarise(total_count = sum(count))
+
+# Join the total counts with the original data and calculate normalized counts
+# Normalized counts per genus and per city
+ot_normalized_counts_data <- genus_counts_by_source_ot %>%
+  left_join(city_totals_ot, by = "source") %>%
+  mutate(normalized_count = count / total_count) %>%
+  select(-total_count)
+
+# Store normalized counts vector in list
+normalized_counts_list <- list()
+
+# Create a dataframe containing all cities
+all_cities_ot <- data.frame(source = unique(genus_counts_by_source_ot$source))
+
+
+
+# Loop over each genus and calculate normalized counts 
+for (j in unique(genus_counts_by_source_ot$genus)) {
+  
+  # Get normalized per-genus counts for cities
+  genus_normalized <- ot_normalized_counts_data %>%
+    filter(genus == j) %>%
+    select(source, normalized_count)
+  
+  genus_normalized_all <- left_join(all_cities_ot, genus_normalized, by = "source")
+  
+  # For cities where a genus is not observed, set the normalized count to 0
+  genus_normalized_all$normalized_count[is.na(genus_normalized_all$normalized_count)] <- 0
+  
+  # Combine results in list for each genus
+  normalized_counts_list[[j]] <- genus_normalized_all
+  
+}
+
+# Extract normalized counts for all genera
+normalized_counts_all <- lapply(normalized_counts_list, `[[`, "normalized_count")
+
+# Add missing genera as vectors of all 0s of length 70 by genus name to Opentrees for comparison with iNat and AutoArborist genera (309 genera)
+
+# Get the names of genera from both lists
+normalized_counts_names <- names(normalized_counts_all)
+aa_normalized_counts_names <- names(aa_normalized_counts_all)
+
+# Find genus names in autoarborist that are not in opentrees
+unique_names_aa <- setdiff(aa_normalized_counts_names, normalized_counts_names)
+
+# Step 3: Create vectors of zeros for missing genera
+missing_normalized <- lapply(unique_names_aa, function(name) numeric(70))
+
+# Step 4: Combine the missing vectors with the original lists
+for (name in unique_names_aa) {
+  normalized_counts_all[[name]] <- numeric(70)
+}
+
+# Combine normalized count dataframes for all genera
+combined_normalized_counts <- do.call(cbind, c(list(normalized_counts_list[[1]]$source), normalized_counts_all))
+
+combined_normalized_counts_ot <- as.data.frame(combined_normalized_counts)
+
+# Rename the first column as source city
+names(combined_normalized_counts_ot)[1] <- "source"
+
+# Sort column names
+sorted_column_names <- sort(names(combined_normalized_counts_ot))
+
+# Move 'source' column to the first position
+sorted_column_names <- c("source", sorted_column_names[sorted_column_names != "source"])
+
+# Reorder columns of the data frame
+combined_normalized_counts_ot <- combined_normalized_counts_ot[, sorted_column_names]
+
+
+print("The first ten cities and ten genera normalized per city.")
+
+
+print(combined_normalized_counts_ot[1:10, 1:10])
+
+
+```
+
+
+#### L1 and L2 Norm Per City OpenTrees
+
+```{r, echo=FALSE}
+
+# Get the number of rows (cities) in the data
+num_cities <- nrow(combined_normalized_counts_ot)
+
+# Initialize a matrix to store pairwise L1 distances
+l1_distances <- matrix(0, nrow = num_cities, ncol = num_cities)
+l2_distances <- matrix(0, nrow = num_cities, ncol = num_cities)
+
+# Iterate over each pair of cities
+for (i in 1:num_cities) {
+  for (j in 1:num_cities) {
+    # Extract normalized count vectors for the two cities
+    city1_vector <- as.numeric(combined_normalized_counts_ot[i, -1])
+    city2_vector <- as.numeric(combined_normalized_counts_ot[j, -1])
+    
+    # Calculate L1 distance between the two cities and store it in the matrix
+    l1_distances[i, j] <- sum(abs(city1_vector - city2_vector))
+    l2_distances[i, j] <- sqrt(sum((city1_vector - city2_vector)^2))
+  }
+}
+
+# Rename L1 and L2 matrices columns and rows by city name
+rownames(l1_distances) <- combined_normalized_counts_ot$source
+colnames(l1_distances) <- combined_normalized_counts_ot$source
+rownames(l2_distances) <- combined_normalized_counts_ot$source
+colnames(l2_distances) <- combined_normalized_counts_ot$source
+
+# Convert the matrix to a long format dataframe for plotting
+l1_distances_df <- melt(as.matrix(l1_distances))
+l2_distances_df <- melt(as.matrix(l2_distances))
+
+
+print("L1 distances of tree genera between cities shown using a dendrogram.")
+print("Cities with similar distributions of tree genera cluster compared to dissimilar distributions.")
+
+hc <- hclust(dist(l1_distances))
+p <- ggdendrogram(hc, rotate=TRUE, size=1) + 
+  ggtitle("Distance (L1) of tree genera distributions between cities") + 
+  theme(axis.text = element_text(size = 6))
+plot(p)
+
+
+# Custom regional groupings
+city_order <- c("naperville_il", "winnipeg", "prince_george", "edmonton", "calgary", "san_jose_ca1", "bakersfield",
+                "san_jose_ca_3", "cupertino", "san_jose_ca_2", "mountain_view", "berkeley", "new_west_west", "new_west_east",
+                "north_vancouver", "maple_ridge", "seattle", "pdx-street", "vancouver", "surrey", "allentown", "white_rock",
+                "washington-dc", "wake_forest", "charlottesville_nc", "nichols_arboretum", "hudson_river_park", "springfield_mo",
+                "cornell", "victoria_bc", "pdx-park", "longueuil", "bozeman_mt", "sioux_falls", "three_rivers", "york_ca",
+                "oakville", "kelowna", "denver", "boulder", "durango_co", "ottawa", "montreal", "quebec", "waterloo", "kitchener_ca",
+                "toronto", "buffalo-ny", "st_catharines_ca", "repentigny_ca", "augurn_me", "marysville_oh", "champaign_il",
+                "westerville_oh", "cambridge", "providence", "pittsburgh", "nyc", "west_chester_pa", "placentia_ca", "oxnard",
+                "anaheim_ca","escondido_ca", "san_francisco", "las_vegas", "richardson", "austin", "pacific_grove_ca", "weston_fl", "sarasota_fl")
+
+# Convert Var1 and Var2 to factors with specified levels
+l1_distances_df$Var1 <- factor(l1_distances_df$Var1, levels = city_order)
+l1_distances_df$Var2 <- factor(l1_distances_df$Var2, levels = city_order)
+l2_distances_df$Var1 <- factor(l2_distances_df$Var1, levels = city_order)
+l2_distances_df$Var2 <- factor(l2_distances_df$Var2, levels = city_order)
+
+
+print("The L1 norm calculated between cities shows patterns of similar and dissimilar tree genera.")
+print("L1 norm considers the absolute differences between two vectors.")
+
+# Plot L1 Distances Matrix as Heatmap
+ggplot(l1_distances_df, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_viridis_c() + # Viridis color palette
+  labs(title = "Pairwise L1 Norm Distances Between Cities",
+       x = "City", y = "City") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size=5), axis.text.y = element_text(size=5))
+
+print("L2 norm considers both the magnitude and direction of differences between two vectors")
+
+# Plot L1 Distances Matrix as Heatmap
+ggplot(l2_distances_df, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_viridis_c() + # Viridis color palette
+  labs(title = "Pairwise L2 Norm Distances Between Cities",
+       x = "City", y = "City") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size=5), axis.text.y = element_text(size=5))
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+### iNaturalist Observations {.tabset}
+
+
+```{r, echo=FALSE}
+
+# Load iNaturalist tree observation data filtered to US and CAN
+iNatTreeObs <- fread(paste0(inatPath, "/tree_observations_uscanada.csv"))
+
+# Filter iNat to include only records where genus is found in Autoarborist
+iNatTreeObs_filtered <- iNatTreeObs[iNatTreeObs$genus %in% unique(autoarbObs_NA$Genus), ]
+
+paste("There are ", length(unique(iNatTreeObs_filtered$genus)), " tree genera selected from iNaturalist")
+
+paste("There are ", NROW(iNatTreeObs_filtered), " tree genera records sampled from iNaturalist.")
+
+# Randomly sample 1M points
+inat_sampled_data <- iNatTreeObs_filtered %>%
+  sample_n(1000000, replace = FALSE)
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-125, -65),  ylim = c(25, 60), ratio=1.3) + 
+  geom_point(data = inat_sampled_data, aes(x = longitude, y = latitude)) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Distribution of Sampled Tree Genera from iNaturalist Across the US")
+
+
+```
+
+#### iNat Total Genera
+
+```{r, echo=FALSE}
+
+print("The top reported tree genera in iNaturalist")
+
+# Count the number of instances of each genus
+genus_counts_inat <- table(iNatTreeObs_filtered$genus)
+# Sort the table in descending order
+genus_counts_inat <- sort(genus_counts_inat, decreasing = TRUE)
+
+head(genus_counts_inat, 20)
+
+# Barplot: Count of top-50 genera from iNaturalist 
+genus_counts_inat_df <- data.frame(genus = names(genus_counts_inat), count = as.numeric(genus_counts_inat))
+
+top_50_genera_inat <- head(genus_counts_inat_df[order(-genus_counts_inat_df$count), ], 50)
+
+ggplot(top_50_genera_inat, aes(x = reorder(genus, -count), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Count", title = "Distribution of Top-50 Tree Genera in iNaturalist") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
+```
+
+
+
+#### iNat Count of Genera
+
+```{r, echo=FALSE}
+
+coordinates(iNatTreeObs_filtered) <- ~longitude+latitude
+
+print("Abundance of tree genera in North America from iNaturalist")
+
+# Create empty raster with 1-degree grid over US and CAN with CRS
+gridRaster <- rast(xmin=-140, xmax=-55, ymin=20, ymax=60, resolution=0.1, vals=0, crs="+proj=longlat +datum=WGS84")
+
+# Create an empty list to store genus rasters
+genus_rasters <- list()
+
+# Get relative counts of genera observations from iNaturalist on 0.1-degree grid
+# Loop over unique species in iNaturalist
+for(genus in unique(iNatTreeObs_filtered$genus)) {
+  
+  # Subset tree observations for the current species
+  genus_obs <- iNatTreeObs_filtered[iNatTreeObs_filtered$genus == genus, ]
+  
+  # Spatially join subsetted points with the 1-degree grid
+  genus_raster <- rasterize(coordinates(genus_obs), gridRaster, fun="count")
+  
+  # Add the genus raster to the list
+  genus_rasters[[genus]] <- genus_raster
+  
+}
+
+# Combine the individual genus rasters list into a single stack
+genus_stack_rast <- rast(genus_rasters)
+
+# Plot total number of tree genera in each cell
+levelplot(sum(!is.na(genus_stack_rast)), margin=FALSE, col.regions = viridis(256), xlab = list("Longitude", cex = 0.75), ylab = list("Latitude", cex = 0.75), scales = list(cex = 0.5, cex.axis = 0.5, cex.lab = 0.5), main=list('Count of Tree Genera from iNaturalist',side=1,line=0.5))
+
+iNatTreeObs_filtered <- as.data.frame(iNatTreeObs_filtered)
+
+```
+
+
+
+
+
+#### Compare Trees in iNat to OpenTrees in NYC
+
+```{r echo=FALSE}
+
+print("Do urban trees genera have a different relative abundance than in natural settings?")
+
+print("Compare OpenTrees and iNat records in NYC")
+
+# Define the radius (in decimal degrees) within which you want to search for observations
+radius <- 0.2
+
+nyc_ot <- opentrees_sampled_data[opentrees_sampled_data$source == "nyc",]
+
+# Use city location to subset iNat records
+subsetted_iNatTreeObs_nyc <- iNatTreeObs_filtered %>%
+  filter(latitude >= nyc_ot$latitude - radius & latitude <= nyc_ot$latitude + radius &
+         longitude >= nyc_ot$longitude - radius & longitude <= nyc_ot$longitude + radius)
+
+print("Sampled iNat records within 0.2 decimal degrees")
+
+paste("There are", nrow(subsetted_iNatTreeObs_nyc), "tree genera records from iNat in NYC.")
+
+# Subset opentrees observations to austin, tx
+openTreesObs_nyc <- openTreesObs_NA_filtered %>%
+  filter(source == "nyc")
+
+paste("There are", nrow(openTreesObs_nyc), "tree genera records from OpenTrees in NYC.")
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+# Plot OpenTrees Observations
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-73.34866, -74.34826),  ylim = c(40.15949, 41.15939), ratio=1.3) + 
+  geom_point(data = openTreesObs_nyc, aes(x = longitude, y = latitude, color = genus), size = 1, alpha=0.7, show.legend=FALSE) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Trees in NYC (OpenTrees)")
+
+plot(p)
+
+# Plot iNaturalist Observations
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-73.34866, -74.34826),  ylim = c(40.15949, 41.15939), ratio=1.3) + 
+  geom_point(data = subsetted_iNatTreeObs_nyc, aes(x = longitude, y = latitude, color = genus), size = 1, alpha=0.7, show.legend=FALSE) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Trees in NYC (iNat)")
+
+plot(p)
+
+
+```
+
+
+
+```{r, echo=FALSE}
+
+print("Get counts of tree genera from iNat")
+# Count the number of instances of each genus
+subset_genus_counts_inat_nyc <- subsetted_iNatTreeObs_nyc %>% 
+  group_by(genus) %>% 
+  summarize(count = n())
+
+#print(subset_genus_counts_inat_nyc)
+
+print("Normalize counts of tree genera from iNat")
+# Normalize counts per genus
+subset_genus_counts_inat_nyc <- subset_genus_counts_inat_nyc %>%
+  mutate(normalized_count = count / sum(count))
+
+print(subset_genus_counts_inat_nyc)
+
+
+# Find missing genera (genera present in Autoarb but not found in iNat sample)
+missing_genera <- autoarbObs_NA_genus %>%
+  anti_join(subset_genus_counts_inat_nyc, by = "genus")
+
+# Create a tibble with missing genera and count and normalized count set to 0
+missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                count = 0,
+                                normalized_count = 0)
+
+
+print("Add additional genera as 0s")
+# Combine missing genera with subset_inat_genus_counts and organize by genus
+subset_genus_counts_inat_nyc <- bind_rows(subset_genus_counts_inat_nyc, missing_genera_counts) %>%
+  arrange(genus)
+
+subset_genus_counts_inat_nyc
+
+# Add the city name to the 'subset_inat_genus_counts' tibble
+subset_genus_counts_inat_nyc$city <- "nyc"
+
+# Plot distribution of tree genera sampled from iNat
+
+ggplot(subset_genus_counts_inat_nyc, aes(x = reorder(genus, -normalized_count), y = normalized_count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Normalized Count", title = "Distribution Tree Genera in iNaturalist NYC") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+```{r, echo=FALSE}
+
+
+# Subset opentrees observations to austin, tx
+#openTreesObs_nyc <- openTreesObs_NA_filtered %>%
+#  filter(source == "nyc")
+
+print("Get counts of tree genera from OpenTrees")
+# Count the number of instances of each genus
+subset_genus_counts_ot_nyc <- openTreesObs_nyc %>% 
+  group_by(genus) %>% 
+  summarize(count = n())
+
+#print(subset_genus_counts_ot_nyc)
+
+print("Normalize counts of tree genera from iNat")
+# Normalize counts per genus
+subset_genus_counts_ot_nyc <- subset_genus_counts_ot_nyc %>%
+  mutate(normalized_count = count / sum(count))
+
+print(subset_genus_counts_ot_nyc)
+
+
+# Find missing genera (genera present in Autoarb but not found in iNat sample)
+missing_genera <- autoarbObs_NA_genus %>%
+  anti_join(subset_genus_counts_ot_nyc, by = "genus")
+
+# Create a tibble with missing genera and count and normalized count set to 0
+missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                count = 0,
+                                normalized_count = 0)
+
+
+print("Add additional genera as 0s")
+# Combine missing genera with subset_inat_genus_counts and organize by genus
+subset_genus_counts_ot_nyc <- bind_rows(subset_genus_counts_ot_nyc, missing_genera_counts) %>%
+  arrange(genus)
+
+subset_genus_counts_ot_nyc
+
+
+# Plot distribution of tree genera sampled from Opentrees
+
+ggplot(subset_genus_counts_ot_nyc, aes(x = reorder(genus, -normalized_count), y = normalized_count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Normalized Count", title = "Distribution Tree Genera in iNaturalist NYC") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
+```
+
+```{r, echo=FALSE}
+
+print("Calculate the L1 Norm (Distance) between Tree Genera from iNat and OpenTrees in NYC")
+
+# Extract normalized count vectors for the two cities
+nyc_ot_vector <- as.numeric(subset_genus_counts_ot_nyc$normalized_count)
+nyc_inat_vector <- as.numeric(subset_genus_counts_inat_nyc$normalized_count)
+
+# Calculate L1 distance between the two cities and store it in the matrix
+l1_distance <- sum(abs(nyc_ot_vector - nyc_inat_vector))
+
+paste("The L1 Distance Between Tree Genera From iNat and OpenTrees in NYC is: ", l1_distance)
+
+
+```
+
+
+```{r, echo=FALSE}
+
+print("Which tree genera are contributing most to the differnece in tree genera distributions (high L1 distance)?")
+
+subset_genus_counts_inat_nyc <- subset_genus_counts_inat_nyc %>%
+  filter(normalized_count != 0) %>%
+  arrange(city, desc(normalized_count))
+
+subset_genus_counts_ot_nyc <- subset_genus_counts_ot_nyc %>%
+  filter(normalized_count != 0) %>%
+  arrange(city, desc(normalized_count))
+
+
+# Perform anti-join operation to find genera from inat not found in opentrees
+genera_not_in_opentrees <- anti_join(subset_genus_counts_inat_nyc,  subset_genus_counts_ot_nyc, by = "genus")
+
+# Print the results
+print(paste("Number of genera from iNaturalist not found in OpenTrees:", nrow(genera_not_in_opentrees)))
+
+
+# Merge the two tibbles based on the genus column
+merged_tibbles <- merge(subset_genus_counts_ot_nyc, subset_genus_counts_inat_nyc, by = "genus", suffixes = c("_opentrees", "_inat"))
+
+# Calculate the difference in normalized counts per genus
+merged_tibbles <- merged_tibbles %>%
+  mutate(difference = normalized_count_opentrees - normalized_count_inat)
+
+print("Plot difference in normalized counts per genus and dataset (OpenTrees - iNat)")
+print("Right: Genera more common in OpenTrees")
+print("Left: Genera more common in iNaturalist")
+
+# Plot the differences per genus
+p <- ggplot(merged_tibbles, aes(x = reorder(genus, difference), y = difference, fill = difference)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  labs(x = "Genus", y = "Difference in Normalized Count", title = "Diff. Normalized Tree Genera Counts (OpenTrees - iNat) in NYC") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  scale_fill_viridis_c()
+
+print(p)
+
+
+```
+
+
+
+
+
+#### iNat Genera Comparison to OpenTrees
+
+
+```{r echo=FALSE}
+
+# Get locations and sample occurrences from iNaturalist for all OpenTrees cities
+
+# Initialize an empty list to store the tibbles for each city
+inat_genus_samples_opentrees <- list()
+
+for(i in 1:nrow(opentrees_sampled_data)){
+  
+  # Get the location and city name from OpenTrees
+  city_ot <- opentrees_sampled_data$source[i]
+  city_lat_ot <- opentrees_sampled_data$latitude[i]
+  city_lon_ot <- opentrees_sampled_data$longitude[i]
+  
+  # Define the radius (in decimal degrees) within which you want to search for observations
+  radius <- 0.2 
+  
+  # Use city location to subset iNat records
+  subsetted_iNatTreeObs <- iNatTreeObs_filtered %>%
+    filter(latitude >= city_lat_ot - radius & latitude <= city_lat_ot + radius &
+           longitude >= city_lon_ot - radius & longitude <= city_lon_ot + radius)
+
+  # Count the number of instances of each genus
+  subset_genus_counts_inat <- subsetted_iNatTreeObs %>% 
+    group_by(genus) %>% 
+    summarize(count = n())
+  
+  # Normalize counts per genus
+  subset_inat_genus_counts <- subset_genus_counts_inat %>%
+    mutate(normalized_count = count / sum(count))
+
+  # Find missing genera (genera present in Autoarb but not found in iNat sample)
+  missing_genera <- autoarbObs_NA_genus %>%
+    anti_join(subset_inat_genus_counts, by = "genus")
+  
+  # Create a tibble with missing genera and count and normalized count set to 0
+  missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                  count = 0,
+                                  normalized_count = 0)
+  
+  # Combine missing genera with subset_inat_genus_counts and organize by genus
+  subset_inat_genus_counts <- bind_rows(subset_inat_genus_counts, missing_genera_counts) %>%
+    arrange(genus)
+  
+  # Add the city name to the 'subset_inat_genus_counts' tibble
+  subset_inat_genus_counts$city <- city_ot
+  
+  # Add the resulting table to the list
+  inat_genus_samples_opentrees[[i]] <- subset_inat_genus_counts
+
+}
+
+
+inat_genus_samples_opentrees_all <- do.call("rbind", inat_genus_samples_opentrees)
+
+
+
+```
+
+
+
+```{r echo=FALSE}
+
+print("Plot difference in normalized counts per genus and dataset (OpenTrees - iNaturalist)")
+print("Right: Genera more common in OpenTrees")
+print("Left: Genera more common in iNaturalist")
+
+
+# Compare distributions of genera from OpenTrees and iNat in each OpenTrees City
+
+# Initialize a dataframe to store overall differences
+overall_differences <- data.frame(genus = character(), difference = numeric())
+
+for(j in 1:length(unique(ot_normalized_counts_data$source))){
+  
+  # Get top-10 Opentrees normalized per-genus counts
+  opentrees_norm_genera_city <- ot_normalized_counts_data %>%
+    filter(source == ot_normalized_counts_data$source[j]) %>%
+    arrange(source, desc(normalized_count))
+
+  # Get top-10 iNaturalist normalized per-genus counts
+  inat_norm_genera_city <- inat_genus_samples_opentrees_all %>%
+    filter(city == ot_normalized_counts_data$source[j]) %>%
+    filter(normalized_count != 0) %>%
+    arrange(city, desc(normalized_count))
+  
+  # Perform anti-join operation to find genera from inat not found in opentrees
+  genera_not_in_opentrees <- anti_join(inat_norm_genera_city,  opentrees_norm_genera_city, by = "genus")
+
+  # Print the results
+  #print(paste("Number of genera from iNaturalist not found in OpenTrees:", nrow(genera_not_in_opentrees)))
+  
+  #print(genera_not_in_opentrees)
+  
+  # Merge the two tibbles based on the genus column
+  merged_tibbles <- merge(opentrees_norm_genera_city, inat_norm_genera_city, by = "genus", suffixes = c("_opentrees", "_inat"))
+  
+  # Calculate the difference in normalized counts per genus
+  merged_tibbles <- merged_tibbles %>%
+    mutate(difference = normalized_count_opentrees - normalized_count_inat)
+  
+   # Append the differences to overall_differences dataframe
+  overall_differences <- rbind(overall_differences, merged_tibbles[, c("genus", "difference")])
+  
+  # Plot the differences per genus
+  p <- ggplot(merged_tibbles, aes(x = reorder(genus, difference), y = difference, fill = difference)) +
+    geom_bar(stat = "identity", alpha = 0.8) +
+    labs(x = "Genus", y = "Difference in Normalized Count", title = paste("Difference in Norm Counts per Genus (OpenTrees - iNat) in City", ot_normalized_counts_data$source[j])) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+    scale_fill_viridis_c()
+
+  print(p)
+
+}
+
+
+
+```
+
+
+
+
+
+
+
+
+```{r, echo=FALSE, eval=FALSE}
+
+# Experimental : Map of L1 Distances from iNaturalist genera
+
+# Create a regular grid across the US with a 1 degree lat/lon resolution to sample iNaturalist tree genera
+us_bounds <- list(
+  lat = c(24, 49),
+  lon = c(-125, -67)
+)
+
+lat_grid <- seq(us_bounds$lat[1], us_bounds$lat[2], by = 1)
+lon_grid <- seq(us_bounds$lon[1], us_bounds$lon[2], by = 1)
+
+grid_df <- expand.grid(latitude = lat_grid, longitude = lon_grid)
+
+# Divide the iNaturalist samples by the resulting grid
+iNatTreeObs_filtered_grid <- iNatTreeObs_filtered %>%
+  mutate(
+    lat_grid_cell = cut(latitude, breaks = lat_grid, labels = FALSE, include.lowest = TRUE),
+    lon_grid_cell = cut(longitude, breaks = lon_grid, labels = FALSE, include.lowest = TRUE),
+    grid_cell_id = interaction(lat_grid_cell, lon_grid_cell, drop = TRUE)
+  )
+
+# Count number of tree genera observations in each 1-degree lat/lon grid cell
+grid_counts <- iNatTreeObs_filtered_grid %>%
+  group_by(grid_cell_id) %>%
+  summarize(count = n()) %>%
+  filter(count >= 300)
+
+# Remove grid cells where the number of observations is less than 300, retains 800 grid cells
+iNatTreeObs_filtered_grid <- iNatTreeObs_filtered_grid %>%
+  inner_join(grid_counts, by = "grid_cell_id") %>%
+  filter(count >= 300) %>%
+  select(-count)
+
+
+```
+
+
+```{r, echo=FALSE, eval=FALSE}
+
+# Function to calculate normalized per-genus counts for a grid cell
+calculate_normalized_counts <- function(grid_df) {
+  # Count the number of instances of each genus
+  genus_counts <- grid_df %>% 
+    group_by(genus) %>% 
+    summarize(count = n())
+  
+  # Normalize counts per genus
+  genus_counts <- genus_counts %>%
+    mutate(normalized_count = count / sum(count))
+  
+  # Find missing genera (genera present in Autoarb but not found in iNat sample)
+  missing_genera <- autoarbObs_NA_genus %>%
+    anti_join(genus_counts, by = "genus")
+  
+  # Create a tibble with missing genera and count and normalized count set to 0
+  missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                  count = 0,
+                                  normalized_count = 0)
+  
+  # Combine missing genera with genus_counts and organize by genus
+  genus_counts <- bind_rows(genus_counts, missing_genera_counts) %>%
+    arrange(genus)
+  
+  return(genus_counts)
+}
+
+# Function to calculate L1 distance between two grid cells
+calculate_L1_distance <- function(grid_1_counts, grid_2_counts) {
+  # Extract normalized count vectors for the two grid cells
+  grid_1_vector <- as.numeric(grid_1_counts$normalized_count)
+  grid_2_vector <- as.numeric(grid_2_counts$normalized_count)
+  
+  # Calculate L1 distance between the two grid cells
+  l1_distance <- sum(abs(grid_1_vector - grid_2_vector))
+  
+  return(l1_distance)
+}
+
+
+
+# Loop through each grid cell and calculate L1 distance with the selected grid cell
+selected_grid_cell <- iNatTreeObs_filtered_grid %>% 
+  filter(lat_grid_cell == 16 & lon_grid_cell == 37)  # Specify the selected grid cell
+# Example: lat_grid[17], lon_grid[52]
+
+selected_grid_cell_counts <- calculate_normalized_counts(selected_grid_cell)
+
+l1_distances <- list()  # Initialize vector to store L1 distances
+
+for (i in 1:nrow(grid_counts)) {
+  
+  # Get current grid cell index
+  lat_cell <- grid_counts$lat_grid_cell[i]
+  lon_cell <- grid_counts$lon_grid_cell[i]
+  
+  # Filter data for the current grid cell
+  current_grid_cell <- iNatTreeObs_filtered_grid %>%
+    filter(lat_grid_cell == lat_cell, lon_grid_cell == lon_cell)
+  
+  # Calculate normalized counts for the current grid cell
+  current_grid_counts <- calculate_normalized_counts(current_grid_cell)
+  
+  # Calculate L1 distance between selected grid cell and current grid cell
+  l1_distance <- calculate_L1_distance(selected_grid_cell_counts, current_grid_counts)
+  
+  # Store L1 distance, lat_cell, lon_cell
+  l1_distances[[i]] <- list(lat_grid_cell = lat_cell, lon_grid_cell = lon_cell, l1 = l1_distance)
+  
+}
+
+l1_distances_df <- bind_rows(l1_distances)
+
+# Function to convert grid cell indices to latitude and longitude values
+convert_indices_to_coordinates <- function(lat_index, lon_index, lat_grid, lon_grid) {
+  lat <- lat_grid[lat_index]
+  lon <- lon_grid[lon_index]
+  return(list(latitude = lat, longitude = lon))
+}
+
+# Apply the function to each row of l1_distances_df
+coordinates <- apply(l1_distances_df[, c("lat_grid_cell", "lon_grid_cell")], 1, 
+                      FUN = function(x) convert_indices_to_coordinates(x[1], x[2], lat_grid, lon_grid))
+
+# Add latitude and longitude columns to l1_distances_df
+l1_distances_df$latitude <- sapply(coordinates, function(x) x$latitude)
+l1_distances_df$longitude <- sapply(coordinates, function(x) x$longitude)
+
+# Highlighted latitude and longitude
+highlight_lat <- 39
+highlight_lon <- -89
+
+# Plot heatmap of L1 distances per grid cell
+ggplot(l1_distances_df, aes(x = longitude, y = latitude, fill = l1)) +
+  geom_tile(color = "white") +
+  geom_tile(data = subset(l1_distances_df, latitude == highlight_lat & longitude == highlight_lon),
+            fill = "red", alpha = 0.5) +  # Highlight the specified grid cell
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(x = "Longitude", y = "Latitude", title = "L1 Distance Between Regions in US: Heatmap from iNat Tree Genera") +
+  theme_minimal()
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+### Forest Inventory Analysis Observations {.tabset}
+
+```{r, echo=FALSE}
+
+# Read the .csv file containing SPCD codes and species names
+spcd_species_ref <- read.csv("C:/Users/talake2/Downloads/CSV_FIADB_ENTIRE/ENTIRE_REF_SPECIES.csv")
+
+# Create a mapping between SPCD codes and species names
+spcd_species_mapping <- setNames(spcd_species_ref$SCIENTIFIC_NAME, spcd_species_ref$SPCD)
+
+# FIA Plot Tree Genera Information
+tree <- fread(paste0(fiaPath, "/ENTIRE_TREE.csv"))
+
+tree <- tree[, c("PLT_CN", "SPCD")]
+
+# FIA Plot Location Information
+plot <- fread(paste0(fiaPath, "/ENTIRE_PLOT.csv"))
+
+plot <- plot[, c("CN", "LAT", "LON")]
+
+# Merge Tree and Plot Info with InnerJoin on the 'CN' field
+mergedFIA <- inner_join(tree, plot, by=c("PLT_CN" = "CN"))
+
+# Add tree genus and species names to mergedFIA based on SPCD codes
+mergedFIA_genera <- mergedFIA %>%
+  mutate(Species = spcd_species_mapping[as.character(SPCD)]) 
+
+# Separate Species column into genus and species
+mergedFIA_genera <- separate(mergedFIA_genera, 
+                              col = Species, 
+                              into = c("Genus", "Species"), 
+                              sep = " ", 
+                              remove = FALSE)
+
+# Convert 'Genus' names column to lowercase
+mergedFIA_genera$Genus <- tolower(mergedFIA_genera$Genus)
+
+# Subset records to only contain tree genera found in AutoArborist
+mergedFIA_genera <- mergedFIA_genera[mergedFIA_genera$Genus %in% unique(autoarbObs_NA$Genus), ]
+
+paste("There are", length(unique(mergedFIA_genera$Genus)), "unique genera in the FIA dataset")
+
+paste("There are", NROW(mergedFIA_genera), "records in the FIA dataset")
+
+# Randomly sample 1M points
+fia_sampled_data <- mergedFIA_genera %>%
+  sample_n(1000000, replace = FALSE)
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-125, -65),  ylim = c(25, 60), ratio=1.3) + 
+  geom_point(data = fia_sampled_data, aes(x = LON, y = LAT)) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Distribution of Sampled Trees from the FIA Across the US")
+
+gc()
+
+```
+
+
+#### FIA Total Genera
+
+```{r, echo=FALSE}
+
+print("The top reported tree genera in FIA")
+
+# Count the number of instances of each genus
+genus_counts_fia <- table(mergedFIA_genera$Genus)
+# Sort the table in descending order
+genus_counts_fia <- sort(genus_counts_fia, decreasing = TRUE)
+
+head(genus_counts_fia, 20)
+
+# Barplot: Count of top-50 genera from iNaturalist 
+genus_counts_fia_df <- data.frame(genus = names(genus_counts_fia), count = as.numeric(genus_counts_fia))
+
+top_50_genera_fia <- head(genus_counts_fia_df[order(-genus_counts_fia_df$count), ], 50)
+
+ggplot(top_50_genera_fia, aes(x = reorder(genus, -count), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Count", title = "Distribution of Top-50 Tree Genera in FIA") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+```
+
+
+
+
+#### FIA Count of Genera
+
+```{r, echo=FALSE}
+
+
+print("Abundance of tree genera in North America from FIA")
+
+# Create empty raster with 1-degree grid over US and CAN with CRS
+gridRaster <- rast(xmin=-140, xmax=-55, ymin=20, ymax=60, resolution=0.1, vals=0, crs="+proj=longlat +datum=WGS84")
+
+# Create an empty list to store genus rasters
+genus_rasters <- list()
+
+# Get relative counts of species observations from FIA
+for(genus in unique(mergedFIA_genera$Genus)) {
+  
+  # Subset observations for the current genus
+  genus_obs <- mergedFIA_genera[mergedFIA_genera$Genus == genus, ]
+  
+  # Get plot coordinates
+  coordinates(genus_obs) <- ~LON+LAT
+  
+  # Spatially join subsetted points with the 1-degree grid
+  genus_raster <- rasterize(coordinates(genus_obs), gridRaster, fun="count")
+  
+  # Add the genusraster to the list
+  genus_rasters[[genus]] <- genus_raster
+  
+}
+
+# Combine the individual genus rasters list into a single stack
+genus_stack_rast <- rast(genus_rasters)
+
+# Plot total number of tree genera in each cell
+levelplot(sum(!is.na(genus_stack_rast)), margin=FALSE, col.regions = viridis(256), xlab = list("Longitude", cex = 0.75), ylab = list("Latitude", cex = 0.75), scales = list(cex = 0.5, cex.axis = 0.5, cex.lab = 0.5), main=list('Count of Tree Species from FIA Data',side=1,line=0.5))
+
+
+
+```
+
+
+
+#### Compare Trees in FIA to OpenTrees in NYC
+
+
+```{r, echo=FALSE}
+
+
+print("Do urban trees genera have a different relative abundance than in natural settings?")
+
+print("Compare OpenTrees and FIA records around NYC")
+
+# Define the radius (in decimal degrees) within which you want to search for observations
+radius <- 0.5
+
+nyc_ot <- opentrees_sampled_data[opentrees_sampled_data$source == "nyc",]
+
+# Use city location to subset iNat records
+subsetted_FIA_nyc <- mergedFIA_genera %>%
+  filter(LAT >= nyc_ot$latitude - radius & LAT <= nyc_ot$latitude + radius &
+         LON >= nyc_ot$longitude - radius & LON <= nyc_ot$longitude + radius)
+
+print("Sampled FIA records within 0.5 decimal degrees")
+
+paste("There are", nrow(subsetted_FIA_nyc), "tree genera records from FIA around NYC.")
+
+# Subset opentrees observations
+openTreesObs_nyc <- openTreesObs_NA_filtered %>%
+  filter(source == "nyc")
+
+paste("There are", nrow(openTreesObs_nyc), "tree genera records from OpenTrees in NYC.")
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+# Plot OpenTrees Observations
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-73.34866, -74.34826),  ylim = c(40.15949, 41.15939), ratio=1.3) + 
+  geom_point(data = openTreesObs_nyc, aes(x = longitude, y = latitude, color = genus), size = 1, alpha=0.7, show.legend=FALSE) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Trees in NYC (OpenTrees)")
+
+plot(p)
+
+# Plot iNaturalist Observations
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-73.34866, -74.34826),  ylim = c(40.15949, 41.15939), ratio=1.3) + 
+  geom_point(data = subsetted_FIA_nyc, aes(x = LON, y = LAT, color = Genus), size = 1, alpha=0.7, show.legend=FALSE) +
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Trees in NYC (FIA)")
+
+plot(p)
+
+
+
+
+
+
+```
+
+
+
+```{r, echo=FALSE}
+
+
+print("Get counts of tree genera from FIA")
+# Count the number of instances of each genus
+subset_genus_counts_fia_nyc <- subsetted_FIA_nyc %>% 
+  group_by(Genus) %>% 
+  summarize(count = n())
+
+#print(subset_genus_counts_inat_nyc)
+
+print("Normalize counts of tree genera from iNat")
+# Normalize counts per genus
+subset_genus_counts_fia_nyc <- subset_genus_counts_fia_nyc %>%
+  mutate(normalized_count = count / sum(count))
+
+print(subset_genus_counts_fia_nyc)
+
+subset_genus_counts_fia_nyc$genus <- subset_genus_counts_fia_nyc$Genus
+
+# Find missing genera (genera present in Autoarb but not found in iNat sample)
+missing_genera <- autoarbObs_NA_genus %>%
+  anti_join(subset_genus_counts_fia_nyc, by = "genus")
+
+# Create a tibble with missing genera and count and normalized count set to 0
+missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                count = 0,
+                                normalized_count = 0)
+
+
+print("Add additional genera as 0s")
+# Combine missing genera with subset_inat_genus_counts and organize by genus
+subset_genus_counts_fia_nyc <- bind_rows(subset_genus_counts_fia_nyc, missing_genera_counts) %>%
+  arrange(genus)
+
+
+subset_genus_counts_fia_nyc <- subset_genus_counts_fia_nyc %>%
+  select(-Genus)
+
+# Add the city name to the 'subset_inat_genus_counts' tibble
+subset_genus_counts_fia_nyc$city <- "nyc"
+
+# Plot distribution of tree genera sampled from iNat
+
+ggplot(subset_genus_counts_fia_nyc, aes(x = reorder(genus, -normalized_count), y = normalized_count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Normalized Count", title = "Distribution Tree Genera in FIA NYC") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
+```
+
+
+```{r, echo=FALSE}
+
+
+
+# Subset opentrees observations to austin, tx
+#openTreesObs_nyc <- openTreesObs_NA_filtered %>%
+#  filter(source == "nyc")
+
+print("Get counts of tree genera from OpenTrees")
+# Count the number of instances of each genus
+subset_genus_counts_ot_nyc <- openTreesObs_nyc %>% 
+  group_by(genus) %>% 
+  summarize(count = n())
+
+#print(subset_genus_counts_ot_nyc)
+
+print("Normalize counts of tree genera from iNat")
+# Normalize counts per genus
+subset_genus_counts_ot_nyc <- subset_genus_counts_ot_nyc %>%
+  mutate(normalized_count = count / sum(count))
+
+print(subset_genus_counts_ot_nyc)
+
+
+# Find missing genera (genera present in Autoarb but not found in iNat sample)
+missing_genera <- autoarbObs_NA_genus %>%
+  anti_join(subset_genus_counts_ot_nyc, by = "genus")
+
+# Create a tibble with missing genera and count and normalized count set to 0
+missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                count = 0,
+                                normalized_count = 0)
+
+
+print("Add additional genera as 0s")
+# Combine missing genera with subset_inat_genus_counts and organize by genus
+subset_genus_counts_ot_nyc <- bind_rows(subset_genus_counts_ot_nyc, missing_genera_counts) %>%
+  arrange(genus)
+
+#subset_genus_counts_ot_nyc
+
+
+# Plot distribution of tree genera sampled from Opentrees
+
+ggplot(subset_genus_counts_ot_nyc, aes(x = reorder(genus, -normalized_count), y = normalized_count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Normalized Count", title = "Distribution Tree Genera in iNaturalist NYC") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+
+
+```
+
+
+```{r, echo=FALSE}
+
+print("Calculate the L1 Norm (Distance) between Tree Genera from FIA and OpenTrees in NYC")
+
+# Extract normalized count vectors for the two cities
+nyc_ot_vector <- as.numeric(subset_genus_counts_ot_nyc$normalized_count)
+nyc_fia_vector <- as.numeric(subset_genus_counts_fia_nyc$normalized_count)
+
+# Calculate L1 distance between the two cities and store it in the matrix
+l1_distance <- sum(abs(nyc_ot_vector - nyc_fia_vector))
+
+paste("The L1 Distance Between Tree Genera From FIA and OpenTrees in NYC is: ", l1_distance)
+
+
+
+```
+
+
+
+
+
+```{r, echo=FALSE}
+
+print("Which tree genera are contributing most to the differnece in tree genera distributions (high L1 distance)?")
+
+subset_genus_counts_fia_nyc <- subset_genus_counts_fia_nyc %>%
+  filter(normalized_count != 0) %>%
+  arrange(city, desc(normalized_count))
+
+subset_genus_counts_ot_nyc <- subset_genus_counts_ot_nyc %>%
+  filter(normalized_count != 0) %>%
+  arrange(city, desc(normalized_count))
+
+# Perform anti-join operation to find genera from inat not found in opentrees
+genera_not_in_opentrees <- anti_join(subset_genus_counts_fia_nyc,  subset_genus_counts_ot_nyc, by = "genus")
+
+# Print the results
+print(paste("Number of genera from FIA not found in OpenTrees:", nrow(genera_not_in_opentrees)))
+
+
+# Merge the two tibbles based on the genus column
+merged_tibbles <- merge(subset_genus_counts_ot_nyc, subset_genus_counts_fia_nyc, by = "genus", suffixes = c("_opentrees", "_fia"))
+
+# Calculate the difference in normalized counts per genus
+merged_tibbles <- merged_tibbles %>%
+  mutate(difference = normalized_count_opentrees - normalized_count_fia)
+
+print("Plot difference in normalized counts per genus and dataset (OpenTrees - FIA)")
+print("Right: Genera more common in OpenTrees")
+print("Left: Genera more common in FIA")
+
+# Plot the differences per genus
+p <- ggplot(merged_tibbles, aes(x = reorder(genus, difference), y = difference, fill = difference)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  labs(x = "Genus", y = "Difference in Normalized Count", title = "Diff. Normalized Tree Genera Counts (OpenTrees - FIA) in NYC") + 
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  scale_fill_viridis_c()
+
+print(p)
+
+
+```
+
+
+
+#### FIA Genera Comparison to OpenTrees
+
+
+```{r echo=FALSE}
+
+# Get locations and sample occurrences from iNaturalist for all OpenTrees cities
+
+# Initialize an empty list to store the tibbles for each city
+fia_genus_samples_opentrees <- list()
+
+for(i in 1:nrow(opentrees_sampled_data)){
+  
+  # Get the location and city name from OpenTrees
+  city_ot <- opentrees_sampled_data$source[i]
+  city_lat_ot <- opentrees_sampled_data$latitude[i]
+  city_lon_ot <- opentrees_sampled_data$longitude[i]
+  
+  # Define the radius (in decimal degrees) within which you want to search for observations
+  radius <- 0.5 
+  
+  # Use city location to subset iNat records
+  subsetted_FIA <- mergedFIA_genera %>%
+    filter(LAT >= city_lat_ot - radius & LAT <= city_lat_ot + radius &
+           LON >= city_lon_ot - radius & LON <= city_lon_ot + radius)
+  
+  subsetted_FIA$genus <- subsetted_FIA$Genus
+  subsetted_FIA <- subsetted_FIA %>%
+    select(-Genus)
+  
+  # Count the number of instances of each genus
+  subset_genus_counts_fia <- subsetted_FIA %>% 
+    group_by(genus) %>% 
+    summarize(count = n())
+  
+  # Normalize counts per genus
+  subset_fia_genus_counts <- subset_genus_counts_fia %>%
+    mutate(normalized_count = count / sum(count))
+
+  # Find missing genera (genera present in Autoarb but not found in iNat sample)
+  missing_genera <- autoarbObs_NA_genus %>%
+    anti_join(subset_fia_genus_counts, by = "genus")
+  
+  # Create a tibble with missing genera and count and normalized count set to 0
+  missing_genera_counts <- tibble(genus = missing_genera$genus,
+                                  count = 0,
+                                  normalized_count = 0)
+  
+  # Combine missing genera with subset_inat_genus_counts and organize by genus
+  subset_fia_genus_counts <- bind_rows(subset_fia_genus_counts, missing_genera_counts) %>%
+    arrange(genus)
+  
+  # Add the city name to the 'subset_inat_genus_counts' tibble
+  subset_fia_genus_counts$city <- city_ot
+  
+  # Add the resulting table to the list
+  fia_genus_samples_opentrees[[i]] <- subset_fia_genus_counts
+
+}
+
+
+fia_genus_samples_opentrees_all <- do.call("rbind", fia_genus_samples_opentrees)
+
+
+
+```
+
+
+
+```{r echo=FALSE}
+
+print("Plot difference in normalized counts per genus and dataset (OpenTrees - FIA)")
+print("Right: Genera more common in OpenTrees")
+print("Left: Genera more common in FIA")
+
+# Compare distributions of genera from OpenTrees and iNat in each OpenTrees City
+
+# Initialize a dataframe to store overall differences
+overall_differences <- data.frame(genus = character(), difference = numeric())
+
+for(j in 1:length(unique(ot_normalized_counts_data$source))){
+  
+  # Get top-10 Opentrees normalized per-genus counts
+  opentrees_norm_genera_city <- ot_normalized_counts_data %>%
+    filter(source == ot_normalized_counts_data$source[j]) %>%
+    arrange(source, desc(normalized_count))
+
+  # Get top-10 iNaturalist normalized per-genus counts
+  fia_norm_genera_city <- fia_genus_samples_opentrees_all %>%
+    filter(city == ot_normalized_counts_data$source[j]) %>%
+    filter(normalized_count != 0) %>%
+    arrange(city, desc(normalized_count))
+  
+  # Perform anti-join operation to find genera from inat not found in opentrees
+  genera_not_in_opentrees <- anti_join(fia_norm_genera_city,  opentrees_norm_genera_city, by = "genus")
+
+  # Print the results
+  #print(paste("Number of genera from iNaturalist not found in OpenTrees:", nrow(genera_not_in_opentrees)))
+  
+  #print(genera_not_in_opentrees)
+  
+  # Merge the two tibbles based on the genus column
+  merged_tibbles <- merge(opentrees_norm_genera_city, fia_norm_genera_city, by = "genus", suffixes = c("_opentrees", "_fia"))
+  
+  # Calculate the difference in normalized counts per genus
+  merged_tibbles <- merged_tibbles %>%
+    mutate(difference = normalized_count_opentrees - normalized_count_fia)
+  
+   # Append the differences to overall_differences dataframe
+  overall_differences <- rbind(overall_differences, merged_tibbles[, c("genus", "difference")])
+  
+  # Plot the differences per genus
+  p <- ggplot(merged_tibbles, aes(x = reorder(genus, difference), y = difference, fill = difference)) +
+    geom_bar(stat = "identity", alpha = 0.8) +
+    labs(x = "Genus", y = "Difference in Normalized Count", title = paste("Difference in Norm Counts per Genus (OpenTrees - FIA) in City", ot_normalized_counts_data$source[j])) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+    scale_fill_viridis_c()
+
+  print(p)
+
+}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+### FIA Urban Dataset Observations {.tabset}
+
+```{r, echo=FALSE}
+
+
+# Read the .csv file containing SPCD codes and species names
+spcd_species_ref_urban <- fread(paste0(fiaUrbanPath, "/REF_SPECIES.csv"))
+
+# Create a mapping between SPCD codes and species names
+spcd_species_mapping_urban <- setNames(spcd_species_ref_urban$SCIENTIFIC_NAME, spcd_species_ref_urban$SPCD)
+
+# Read the .csv file containing county codes
+state_county_ref_urban <- fread(paste0(fiaUrbanPath, "/REF_COUNTY.csv"))
+
+# Create a mapping between the county codes and county names
+state_county_mapping_urban <- setNames(state_county_ref_urban$COUNTYNM, state_county_ref_urban$COUNTYCD)
+
+# Define States by FIPS code:
+states_fips <- c(6, 48, 41, 53, 29, 20, 17, 18, 55, 24, 11, 51, 19, 44, 25, 23, 27)
+
+# Define State Names:
+state_names <- c("California", "Texas", "Oregon", "Washington", "Missouri", 
+                 "Kansas", "Illinois", "Indiana", "Wisconsin", "Maryland", 
+                 "DC", "Virginia", "Iowa", "Rhode Island", "Massachusetts", 
+                 "Maine", "Minnesota")
+
+# Create named list
+state_fips_named <- setNames(state_names, states_fips)
+
+# FIA Plot Tree Genera Information
+treeUrban <- fread(paste0(fiaUrbanPath, "/ID_TREE.csv"))
+
+# Keep only Plot CN and Species Code columns
+treeUrban <- treeUrban[, c("PLT_CN", "SPCD")]
+
+# FIA Plot Location Information
+plotUrban <- fread(paste0(fiaUrbanPath, "/ID_PLOT.csv"))
+
+# Keep only CN, Location, County, and State columns
+plotUrban <- plotUrban[, c("CN", "LAT", "LON", "COUNTYCD", "STATECD")]
+
+# Merge Tree and Plot Info with InnerJoin on the 'CN' field
+mergedFIAUrban <- inner_join(treeUrban, plotUrban, by=c("PLT_CN" = "CN"))
+
+# Add tree genus and species names to mergedFIA based on SPCD codes
+mergedFIAUrban_genera <- mergedFIAUrban %>%
+  mutate(Species = spcd_species_mapping_urban[as.character(SPCD)])
+
+# Separate species column into genus and species
+mergedFIAUrban_genera <- separate(mergedFIAUrban_genera,
+                                  col = Species,
+                                  into = c("genus", "species"),
+                                  sep = " ",
+                                  remove = FALSE)
+
+# Convert 'Genus' names column to lowercase
+mergedFIAUrban_genera$genus <- tolower(mergedFIAUrban_genera$genus)
+
+# Subset records to only contain tree genera found in Autoarborist
+mergedFIAUrban_genera <- mergedFIAUrban_genera[mergedFIAUrban_genera$genus %in% unique(autoarbObs$Genus), ]
+
+# Add county and state names based on county codes
+mergedFIAUrban_genera <- mergedFIAUrban_genera %>%
+  mutate(County = state_county_mapping_urban[as.character(COUNTYCD)])
+
+mergedFIAUrban_genera <- mergedFIAUrban_genera %>%
+  mutate(State = state_fips_named[as.character(STATECD)])
+
+paste("There are", length(unique(mergedFIAUrban_genera$genus)), "unique genera in the FIA dataset")
+
+paste("There are ", NROW(mergedFIAUrban), " records in the FIA Urban dataset")
+
+# Randomly sample a point per source city
+fia_urban_sampled_data <- mergedFIAUrban_genera %>%
+  group_by(COUNTYCD) %>%
+  sample_n(1, replace = FALSE)
+
+# Create a base map of the US
+map_us <- map_data("world")
+
+p <- ggplot() +
+  geom_polygon(data = map_us, aes(x = long, y = lat, group = group), fill = "grey88", color = "black") +
+  coord_fixed(xlim = c(-125, -65),  ylim = c(25, 60), ratio=1.3) + 
+  geom_point(data = fia_urban_sampled_data, aes(x = LON, y = LAT)) +
+  geom_text(data = fia_urban_sampled_data, aes(x = LON, y = LAT, label = COUNTYCD), vjust = 1.5, size=2) +  # Add labels
+  theme_minimal() +
+  labs(x = "Longitude", y = "Latitude", title = "Distribution of Sampled Counties from the FIA Urban Dataset")
+
+ggplotly(p)
+
+```
+
+
+
+#### Urban FIA Total Genera
+
+```{r, echo=FALSE}
+
+print("The top reported tree genera in Urban FIA")
+
+# Count the number of instances of each genus
+genus_counts_urban_fia <- table(mergedFIAUrban_genera$genus)
+# Sort the table in descending order
+genus_counts_urban_fia  <- sort(genus_counts_urban_fia, decreasing = TRUE)
+
+head(genus_counts_urban_fia, 20)
+
+# Barplot: Count of top-50 genera from iNaturalist 
+genus_counts_urban_fia_df <- data.frame(genus = names(genus_counts_urban_fia), count = as.numeric(genus_counts_urban_fia))
+
+top_50_genera_urban_fia <- head(genus_counts_urban_fia_df[order(-genus_counts_urban_fia_df$count), ], 50)
+
+ggplot(top_50_genera_urban_fia, aes(x = reorder(genus, -count), y = count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genus", y = "Count", title = "Distribution of Top-50 Tree Genera in Urban FIA") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+```
+
+
+
+#### Urban FIA Genus Counts Per State
+
+```{r, echo=FALSE}
+
+
+
+print("Abundance of tree genera per state in Urban FIA")
+
+# Count the number of occurrences of each genus for each city 'source'
+genus_counts_by_state_urban_fia <- mergedFIAUrban_genera %>%
+  group_by(genus, State) %>%
+  summarise(count = n()) %>%
+  ungroup()
+
+# Get the top 50 genera for each state
+#top_50_genus_counts_by_state_urban_fia <- genus_counts_by_state_urban_fia %>%
+#  group_by(State) %>%
+#  top_n(10, count) %>%
+#  arrange(source, desc(count))
+
+
+# Path to save the PDFs
+#pdf_path <- "Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/geopriors/Tree_Genera_Distributions/opentrees/"
+
+# Iterate over each source city
+for (state in unique(genus_counts_by_state_urban_fia$State)) {
+  # Create the plot for the specific city source
+  plot <- ggplot(genus_counts_by_state_urban_fia %>% filter(State == state), aes(x = reorder(genus, -count), y = count)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Genus", y = "Count", title = paste("Distribution of Genera in Urban FIA for", state)) +
+    theme_classic() + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  
+  print(plot)
+  
+  # Save the plot as a PDF
+  #pdf_file <- paste0(pdf_path, "Distribution_of_Genera_in_", gsub(" ", "_", city), ".pdf")
+  #ggsave(filename = pdf_file, plot = plot, device = "pdf", width = 8, height = 6)
+}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
