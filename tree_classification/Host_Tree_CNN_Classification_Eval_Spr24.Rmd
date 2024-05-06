@@ -1,0 +1,1046 @@
+---
+title: "Host Tree CNN Classification Evaluation March 2024"
+author: "Thomas Lake"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: TRUE
+    theme: united
+    highlight: tango
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+```{r libraries, echo=FALSE}
+
+library(ggplot2)
+library(dplyr)
+library(jpeg)
+library(grid)
+library(gridExtra)
+library(renv)
+#renv::restore() unhash this line to restore the renv environment from the lockfile
+```
+
+```{r Functions, include=FALSE, echo=FALSE}
+
+# Function to count JPEG files in a folder
+count_jpeg_files <- function(folder_path) {
+  # Get list of both .jpg and .jpeg files
+  jpeg_files <- list.files(folder_path, pattern = "\\.(jpg|jpeg)$", full.names = TRUE)
+  return(length(jpeg_files))
+}
+
+
+```
+
+## Convolutional Neural Networks for Host Tree Classification {.tabset .tabset-pills}
+
+This R markdown document summarizes the effects of different datasets and models on tree genera classification with convolutional neural networks.
+
+**The models are trained and evaluated on three datasets**
+
+1. iNaturalist images (900 training; 100 testing)
+2. AutoArborist images (900 training; 100 testing)
+3. Combined iNaturalist and Autoarborist images (1800 training; 200 testing)
+
+**The classification performance from two models are compared**
+
+1. The [ResNet50 model](https://arxiv.org/abs/1512.03385) for image classification.
+2. The [EfficientNetV2 model](https://arxiv.org/abs/2104.00298) for image classification.
+
+**All datasets span 25 tree genera, including**
+
+'acer', 'ailanthus', 'betula', 'citrus', 'cupaniopsis', 'erythrina', 'fraxinus', 
+'gleditsia', 'juglans', 'juniperus','magnolia', 'phoenix', 'picea', 'pinus',
+'prunus', 'pseudotsuga', 'pyrus', 'quercus', 'rhus', 'sequoia', 'taxodium',
+'thuja', 'tilia', 'ulmus', 'washingtonia'
+
+The analyses use minimal and identical image augmentations, similar hyperparameters. Each model takes approximately 8-12 hours to train.
+
+### Analyses Questions
+
+1. How does classification performance vary across tree genera?
+2. What effect does model architecture have on classification performance (Resnet vs EfficientNet)? 
+3. How do different tree datasets impact classification performance (iNaturalist vs AutoArborist vs combined)?
+4. Does the model trained on combined datasets perform better than the model trained on AutoArborist only?
+5. How do different resolutions of images impact classification performance?
+6. How does a model trained on Autoarborist predict on iNaturalist? Can we use high-probability iNaturalist tree genera images to improve the AutoArborist dataset?
+
+### Image Data {.tabset}
+
+#### AutoArborist
+
+The AutoArborist dataset contains ~900 training and 100 testing images of the selected tree genera randomly selected from the full AutoArborist dataset.
+
+```{r AutoArborist Dataset, echo=FALSE}
+
+autoarb_data_training = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/autoarborist/training_dataset_small_march624"
+autoarb_training_genera <- list.files(autoarb_data_training)
+
+autoarb_data_testing = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/autoarborist/testing_dataset_small_march624"
+autoarb_testing_genera <- list.files(autoarb_data_testing)
+
+paste("There are", length(autoarb_training_genera), "tree genera for training and testing.")
+
+for (folder in autoarb_training_genera) {
+  folder_path <- file.path(autoarb_data_training, folder)
+  num_files <- count_jpeg_files(folder_path)
+  cat("Number of JPEG files in Autoarborist", folder, "folder:", num_files, "\n")
+}
+
+# Display one example image from the dataset
+acer_folder <- file.path(autoarb_data_training, "acer")
+jpeg_files <- list.files(acer_folder, pattern = ".jpeg$", full.names = TRUE)
+
+cat("Sample image from AutoArborist")
+
+# Read and display the JPEG image
+img1 <- readJPEG(jpeg_files[1])
+grid.raster(img1)
+
+
+```
+
+#### iNaturalist
+
+The iNaturalist dataset contains ~900 training and 100 testing images of the selected tree genera randomly selected from iNatualist.org.
+
+
+```{r iNatualist Dataset, echo=FALSE}
+
+# Data Directory
+inat_data_training = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/inaturalist/training_dataset_small_march624"
+inat_training_genera <- list.files(inat_data_training)
+
+inat_data_testing = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/inaturalist/testing_dataset_small_march624"
+inat_testing_genera <- list.files(inat_data_testing)
+
+paste("There are", length(inat_training_genera), "tree genera for training and testing.")
+
+for (folder in inat_training_genera) {
+  folder_path <- file.path(inat_data_training, folder)
+  num_files <- count_jpeg_files(folder_path)
+  cat("Number of JPEG files in iNaturalist", folder, "folder:", num_files, "\n")
+}
+
+# Display one example image from the dataset
+acer_folder <- file.path(inat_data_training, "acer")
+jpeg_files <- list.files(acer_folder, full.names = TRUE)
+
+cat("Sample image from iNaturlist")
+
+# Read and display the JPEG image
+img2 <- readJPEG(jpeg_files[1])
+grid.raster(img2)
+
+```
+
+#### AutoArborist and iNaturalist
+
+The combined AutoArborist and iNaturalist datasets contain ~1800 training and 200 testing images of the selected tree genera.
+
+```{r Combined Autoarb iNat Datasets, echo=FALSE}
+
+# Data Directory
+autoarb_inat_data_training = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/training_dataset_small_march624"
+autoarb_inat_training_genera <- list.files(autoarb_inat_data_training)
+
+autoarb_inat_data_testing = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624"
+autoarb_inat_testing_genera <- list.files(autoarb_inat_data_testing)
+
+paste("There are", length(autoarb_inat_training_genera), "tree genera for training and testing.")
+
+for (folder in autoarb_inat_training_genera) {
+  folder_path <- file.path(autoarb_inat_data_training, folder)
+  num_files <- count_jpeg_files(folder_path)
+  cat("Number of JPEG files in iNaturalist", folder, "folder:", num_files, "\n")
+}
+
+
+```
+
+### Model Results {.tabset}
+
+#### Performance by genera
+
+##### Resnet50 vs. EfficientNetV2s
+Model precision, recall, and F1 score varies by tree genus.
+
+```{r Summary per Genera}
+
+# Read in results .csv file containing per-class precision, recall metrics for cnn models
+all_results <- read.csv("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/r_markdowns/Model_Eval_Metrics_Per_Genus_Summary_S24.csv")
+
+cnn_results <- all_results %>% filter(grepl("base", Experiment) & Dataset == TestSet)
+
+
+cat("Across models, the average precision, recall, and F1 scores for tree genera")
+
+# Overall model summary per genera:
+genera_summary <- cnn_results %>%
+  group_by(Class) %>%
+  summarize(
+    Avg_Precision = mean(Precision),
+    Avg_Recall = mean(Recall),
+    Avg_F1_Score = mean(F1.Score)
+  )
+
+# Summary of performance metrics per genera
+print(genera_summary, n=30)
+
+# Sort genera_summary by ascending average F1 score
+genera_summary_sorted <- genera_summary %>%
+  arrange(desc(Avg_F1_Score))
+
+cat("Sorted by descending F1 score:")
+
+# View the sorted summary
+print(genera_summary_sorted, n=30)
+```
+##### EfficientNetV2s Experiments: Base vs. Augmented
+###### Base Model: Dataset == iNat_AutoArb, Epochs == 10, Res == 512x512, RandomResizedCrop
+###### Augmented Models (Res): Res == 256x256, 768x768
+###### Augmented Models (transformers): RandomCrop
+
+Model precision, recall, and F1 score varies by tree genus. Overall improved precision,
+recall, and F1 scores are expected because all base experiments use EfficientNetV2s.
+
+```{r Summary per Genera Augmented}
+cnn_results_new <- all_results %>% filter(Model == "EfficientNetv2s" & Epochs == 10 & !grepl("base_en_inat", Experiment))
+
+cat("Across models, the average precision, recall, and F1 scores for tree genera")
+
+# Overall model summary per genera:
+genera_summary_new <- cnn_results_new %>%
+  group_by(Class) %>%
+  summarize(
+    Avg_Precision = mean(Precision),
+    Avg_Recall = mean(Recall),
+    Avg_F1_Score = mean(F1.Score)
+  )
+
+# Summary of performance metrics per genera
+print(genera_summary_new, n=30)
+
+# Sort genera_summary by ascending average F1 score
+genera_summary_new_sorted <- genera_summary_new %>%
+  arrange(desc(Avg_F1_Score))
+
+cat("Sorted by descending F1 score:")
+
+# View the sorted summary
+print(genera_summary_new_sorted, n=30)
+```
+#### Performance by model and dataset and experiment
+
+##### Resnet50 vs. EfficientNetV2s
+Overall, comparing across models and datasets, we find that:
+
+1. Across genera, the F1 score is highest for models using the iNaturalist dataset.
+2. Across genera, the F1 score is lowest for models using the AutoArborist dataset.
+3. Combining images from the iNaturalist and AutoArborist datasets improved F1 scores across genera.
+
+```{r F1 Score by Model}
+
+# Plot overall comparison between model types and datasets
+# Plot paired boxplots for F1 score, comparing between model types across datasets
+f1_score_boxplot <- ggplot(cnn_results, aes(x = Dataset, y = F1.Score, fill = Model)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.6) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Dataset", y = "F1 Score", title = "Comparison of F1 Score between Model Types across Datasets")
+
+# Print the plot
+print(f1_score_boxplot)
+
+```
+```{r Model Eval for Architecture}
+
+cat("Across genera and datasets, we see an increase in Precision, Recall, and F1 scores when using EfficientNet vs ResNet.")
+
+cat("Sorted by descending F1 score:")
+
+# Overall model summary:
+# Calculate average precision, recall, and f1 scores per model across all datasets
+model_summary <- cnn_results %>%
+  group_by(Model) %>%
+  summarize(
+    Avg_Precision = mean(Precision),
+    Avg_Recall = mean(Recall),
+    Avg_F1_Score = mean(F1.Score),
+    Avg_Accuracy = mean(Accuracy),
+    Total_Support = sum(Support)
+  )
+
+# Sort by Avg_Precision
+model_summary <- model_summary[order(model_summary$Avg_Precision, decreasing = TRUE),]
+
+# Print summary statistics by Model
+print(model_summary)
+
+
+```
+
+
+##### EfficientNetV2s Experiments: Base vs. Augmented
+
+1. Base and augmented models trained on both datasets have a lower F1 score when
+tested on the AutoArborist dataset compared to the base model trained on the AutoArborist dataset only.
+2. For models trained on the combined dataset, the fine resolution model (768x768) has the highest F1 score regardless of the testing dataset type.
+3. For models trained on the combined dataset, the RandomCrop model has the lowest F1 score regardless of the testing dataset type.
+
+```{r F1 Score by EfficientNetv2s}
+
+# Plot overall comparison between model types and datasets
+# Plot paired boxplots for F1 score, comparing between model types across datasets
+f1_score_boxplot <- ggplot(cnn_results_new, aes(x = Experiment, y = F1.Score, fill = TestSet)) +
+  geom_boxplot(position = position_dodge(width = 0.8), width = 0.6) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Experiment", y = "F1 Score", title = "Comparison of F1 Score between Experiments when Tested on AutoArborist Dataset")
+
+# Print the plot
+print(f1_score_boxplot)
+
+```
+
+
+
+```{r Model Eval for Experiment}
+
+cnn_results_new_aaonly <- cnn_results_new %>% filter(TestSet == "AutoArborist")
+
+cat("Decrease in Precision, Recall, and F1 scores for models trained on combined datasets (tested on AutoArborist)
+     vs. models trained on AutoArborist (and tested on AutoArborist)")
+cat("Sorted by descending F1 score:")
+
+# Overall model summary:
+# Calculate average precision, recall, and f1 scores per model across all datasets
+model_summary <- cnn_results_new_aaonly %>%
+  group_by(Experiment) %>%
+  summarize(
+    Avg_Precision = mean(Precision),
+    Avg_Recall = mean(Recall),
+    Avg_F1_Score = mean(F1.Score),
+    Avg_Accuracy = mean(Accuracy),
+    Total_Support = sum(Support)
+  )
+
+# Sort by Avg_Precision
+model_summary <- model_summary[order(model_summary$Avg_F1_Score, decreasing = TRUE),]
+
+# Print summary statistics by Model
+print(model_summary)
+
+cat("Across genera and datasets, and for models trained on the combined datasets, we see an 
+increase in Precision, Recall, and F1 scores when increasing the resolution of images.")
+
+cat("Sorted by descending F1 score:")
+
+cnn_results_new_cmb <- cnn_results_new %>% filter(Dataset == "iNat_AutoArb")
+
+model_summary <- cnn_results_new_cmb %>%
+  group_by(Experiment) %>%
+  summarize(
+    Avg_Precision = mean(Precision),
+    Avg_Recall = mean(Recall),
+    Avg_F1_Score = mean(F1.Score),
+    Avg_Accuracy = mean(Accuracy),
+    Total_Support = sum(Support)
+  )
+
+# Sort by Avg_Precision
+model_summary <- model_summary[order(model_summary$Avg_F1_Score, decreasing = TRUE),]
+
+# Print summary statistics by Model
+print(model_summary)
+
+```
+
+#### iNat models
+##### ResNet vs. EfficientNetV2s
+We find that most genera experience an increase in F1 score for tree genera classification when using EfficientNet vs ResNet. 
+```{r Performance per Genera iNat}
+
+# How does ResNet vs. EfficientNet model performance differ when trained on the iNaturalist dataset:
+
+# Filter the data for the 'inaturalist' dataset and models 'ResNet50' and 'EfficientNet'
+filtered_data_inat_only <- cnn_results %>%
+  filter(Dataset == 'iNaturalist' & Model %in% c('ResNet50', 'EfficientNetv2s'))
+
+# Calculate mean F1 scores for ResNet50 and EfficientNetv2s models
+mean_f1_resnet <- mean(filtered_data_inat_only$F1.Score[filtered_data_inat_only$Model == 'ResNet50'])
+mean_f1_efficientnet <- mean(filtered_data_inat_only$F1.Score[filtered_data_inat_only$Model == 'EfficientNetv2s'])
+
+# Calculate the difference in mean F1 scores
+mean_difference <- mean_f1_efficientnet - mean_f1_resnet
+
+paste("The average increase in F1 score from ResNet to EfficienNetV2 with the iNat data is:", mean_difference)
+
+# Plot F1 score per class, comparing between ResNet50 and EfficientNet, facet by class
+inat_f1_comparison_plot <- ggplot(filtered_data_inat_only, aes(x = Model, y = F1.Score, group = Class, color = Class)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  facet_wrap(~ Class, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  ylim(0, 1) + 
+  labs(x = "Model", y = "F1 Score", title = "F1 Score for ResNet50 and EfficientNet (iNaturalist Dataset Only)")
+
+# Print the plot
+print(inat_f1_comparison_plot)
+
+cat("Confusion matrix for iNaturalist data with EfficientNet model")
+
+
+knitr::include_graphics("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024/tree-classification-inat-25-genera-1000imgs-effnet2s-10epochs-lr001-march724/confmat.png")
+
+
+cat("Loss curves for iNaturalist data with EfficienetNet model")
+
+knitr::include_graphics("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024/tree-classification-inat-25-genera-1000imgs-effnet2s-10epochs-lr001-march724/loss.png")
+```
+##### EfficientNetV2s Experiments: Base vs. Augmented (Trained on Combined)
+We find that most genera experience an increase in F1 score for tree genera classification when using increasing resolution (and vice versa), and decrease with random crop. 
+```{r Performance per Genera iNat Augmented}
+
+# How does performance differ when tested on the iNaturalist dataset with EfficientNetV2s models with 512x512 res (base), 256x256 res, 768x768 res, and RandomCrop only:
+# Filter the data for the 'inaturalist' dataset from the EfficientNetv2s models trained on the combined dataset
+cnn_results_new_cmb <- cnn_results_new_cmb %>% filter(Dataset == "iNat_AutoArb")
+cnn_results_new_cmb_inat <- cnn_results_new_cmb %>% filter(TestSet == "iNaturalist")
+
+# Calculate mean F1 scores for Experiments: base_en_cmb, coarser_res, finer_res, random_crop_only
+type <- c("base_en_cmb", "coarser_res", "finer_res", "random_crop_only")
+mean <- lapply(type, function(x){
+  mean(cnn_results_new_cmb_inat$F1.Score[cnn_results_new_cmb_inat$Experiment == x])
+})
+
+# Calculate the difference in mean F1 scores
+mean_diff <- lapply(2:length(mean), function(x){
+  mean[[x]] - mean[[1]]
+})
+
+type <- c("coarser res", "finer res", "random crop")
+lapply(seq_along(type), function(x){
+  paste("The average increase in F1 score from base to", type[[x]], "with iNat data is:", mean_diff[[x]])
+})
+
+# Plot F1 score per class, comparing between ResNet50 and EfficientNet, facet by class
+
+inat_f1_comparison_plot <- ggplot(cnn_results_new_cmb_inat, aes(x = Experiment, y = F1.Score, group = Class, color = Class)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  facet_wrap(~ Class, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  ylim(0, 1) + 
+  labs(x = "Model", y = "F1 Score", title = "F1 Score for Base, Coarser Res, Finer Res, & Random Crop (iNat Dataset Only)")
+
+# Print the plot
+print(inat_f1_comparison_plot)
+
+# Confusion matrix - base model
+path <- "Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_april2024/"
+
+fn <- c("base/base_confusion_matrix_inatonly.png", "exp1_reduced_res/exp1_confusion_matrix_inatonly.png", "exp2_increased_res/exp2_confusion_matrix_inatonly.png", "exp3_randomcrop/exp3_confusion_matrix_inatonly.png")
+
+# For each confusion matrix, print the title and the image
+cat("Confusion matrix for iNaturalist data with base model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[1]))
+
+# Confusion matrix - coarser resolution model
+cat("Confusion matrix for iNaturalist data with coarser resolution model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[2]))
+
+# Confusion matrix - finer resolution model
+cat("Confusion matrix for iNaturalist data with finer resolution model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[3]))
+
+# Confusion matrix - random crop only model
+cat("Confusion matrix for iNaturalist data with random crop only model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[4]))
+```
+#### Autoarborist models
+##### ResNet vs. EfficientNetV2s
+We find that most genera experience an increase in F1 score for tree genera classification when using EfficientNet vs ResNet.
+
+```{r Performance per Genera Autoarb}
+# How does ResNet vs. EfficientNet model performance differ when trained on the AutoArborist dataset:
+
+# Filter the data for the 'inaturalist' dataset and models 'ResNet50' and 'EfficientNet'
+filtered_data_autoarb_only <- cnn_results %>%
+  filter(Dataset == 'AutoArborist' & Model %in% c('ResNet50', 'EfficientNetv2s'))
+
+
+# Calculate mean F1 scores for ResNet50 and EfficientNetv2s models
+mean_f1_resnet <- mean(filtered_data_autoarb_only$F1.Score[filtered_data_autoarb_only$Model == 'ResNet50'])
+mean_f1_efficientnet <- mean(filtered_data_autoarb_only$F1.Score[filtered_data_autoarb_only$Model == 'EfficientNetv2s'])
+
+# Calculate the difference in mean F1 scores
+mean_difference <- mean_f1_efficientnet - mean_f1_resnet
+
+# Print the mean difference
+paste("The average increase in F1 score from ResNet to EfficienNetV2 with the Autoarborist data is:", mean_difference)
+
+
+# Plot F1 score per class, comparing between ResNet50 and EfficientNet, facet by class
+autoarb_f1_comparison_plot <- ggplot(filtered_data_autoarb_only, aes(x = Model, y = F1.Score, group = Class, color = Class)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  facet_wrap(~ Class, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  ylim(0, 1) + 
+  labs(x = "Model", y = "F1 Score", title = "F1 Score for ResNet50 and EfficientNet (AutoArborist Dataset Only)")
+
+# Print the plot
+print(autoarb_f1_comparison_plot)
+
+
+cat("Confusion matrix for Autoarborist data with EfficientNet model")
+
+knitr::include_graphics("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024/tree-classification-autoarb-25-genera-1000imgs-effnet2s-10epochs-lr001-march724/confmat.png")
+
+
+cat("Loss curves for Autoarborist data with EfficienetNet model")
+
+knitr::include_graphics("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024//tree-classification-autoarb-25-genera-1000imgs-effnet2s-10epochs-lr001-march724/loss.png")
+```
+##### EfficientNetV2s Experiments: Base vs. Augmented (Trained on Combined)
+We find that most genera experience an increase in F1 score for tree genera classification when using increased resolution (and vice versa) and decrease with random crop.
+
+```{r Performance per Genera AutoArborist Augmented}
+
+# How does performance differ when tested on the AutoArborist dataset with EfficientNetV2s models with 512x512 res (base), 256x256 res, 768x768 res, and RandomCrop only:
+# Filter the data for the 'inaturalist' dataset from the EfficientNetv2s models trained on the combined dataset
+cnn_results_new_cmb_aa <- cnn_results_new_cmb %>% filter(TestSet == "AutoArborist")
+
+# Calculate mean F1 scores for Experiments: base_en_cmb, coarser_res, finer_res, random_crop_only
+type <- c("base_en_cmb", "coarser_res", "finer_res", "random_crop_only")
+mean <- lapply(type, function(x){
+  mean(cnn_results_new_cmb_aa$F1.Score[cnn_results_new_cmb_aa$Experiment == x])
+})
+
+# Calculate the difference in mean F1 scores
+mean_diff <- lapply(2:length(mean), function(x){
+  mean[[x]] - mean[[1]]
+})
+
+type <- c("coarser res", "finer res", "random crop")
+lapply(seq_along(type), function(x){
+  paste("The average increase in F1 score from base to", type[[x]], "with AutoArborist Test data is:", mean_diff[[x]])
+})
+
+# Plot F1 score per class, comparing between ResNet50 and EfficientNet, facet by class
+
+aa_f1_comparison_plot <- ggplot(cnn_results_new_cmb_aa, aes(x = Experiment, y = F1.Score, group = Class, color = Class)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  facet_wrap(~ Class, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  ylim(0, 1) + 
+  labs(x = "Model", y = "F1 Score", title = "F1 Score for Base, Coarser Res, Finer Res, & Random Crop (AutoArborist Test Set Only)")
+
+# Print the plot
+print(aa_f1_comparison_plot)
+
+# Confusion matrix - base model
+path <- "Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_april2024/"
+
+fn <- c("base/base_confusion_matrix_aaonly.png", "exp1_reduced_res/exp1_confusion_matrix_aaonly.png", "exp2_increased_res/exp2_confusion_matrix_aaonly.png", "exp3_randomcrop/exp3_confusion_matrix_aaonly.png")
+
+# For each confusion matrix, print the title and the image
+cat("Confusion matrix for AutoArborist test data with base model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[1]))
+
+# Confusion matrix - coarser resolution model
+cat("Confusion matrix for AutoArborist test data with coarser resolution model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[2]))
+
+# Confusion matrix - finer resolution model
+cat("Confusion matrix for AutoArborist test data with finer resolution model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[3]))
+
+# Confusion matrix - random crop only model
+cat("Confusion matrix for AutoArborist test data with random crop only model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[4]))
+```
+#### AutoArb + iNat models
+##### ResNet vs. EfficientNetV2s
+We find that most genera experience an increase in F1 score for tree genera classification when using EfficientNet vs ResNet.
+
+```{r Performance per Genera Combined}
+
+# How does ResNet vs. EfficientNet model performance differ when trained on the combined iNaturalist + AutoArborist dataset:
+
+# Filter the data for the 'inaturalist' dataset and models 'ResNet50' and 'EfficientNet'
+filtered_data_inat_autoarb_only <- cnn_results %>%
+  filter(Dataset == 'iNat_AutoArb' & Model %in% c('ResNet50', 'EfficientNetv2s'))
+
+# Calculate mean F1 scores for ResNet50 and EfficientNetv2s models
+mean_f1_resnet <- mean(filtered_data_inat_autoarb_only$F1.Score[filtered_data_inat_autoarb_only$Model == 'ResNet50'])
+mean_f1_efficientnet <- mean(filtered_data_inat_autoarb_only$F1.Score[filtered_data_inat_autoarb_only$Model == 'EfficientNetv2s'])
+
+# Calculate the difference in mean F1 scores
+mean_difference <- mean_f1_efficientnet - mean_f1_resnet
+
+# Print the mean difference
+paste("The average increase in F1 score from ResNet to EfficienNetV2 with the iNat+AutoArb data is:", mean_difference)
+
+# Plot F1 score per class, comparing between ResNet50 and EfficientNet, facet by class
+inat_autoarb_f1_comparison_plot <- ggplot(filtered_data_inat_autoarb_only, aes(x = Model, y = F1.Score, group = Class, color = Class)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  facet_wrap(~ Class, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  ylim(0, 1) + 
+  labs(x = "Model", y = "F1 Score", title = "F1 Score for ResNet50 and EfficientNet (iNat + AutoArborist Datasets)")
+
+# Print the plot
+print(inat_autoarb_f1_comparison_plot)
+
+cat("Confusion matrix for Autoarborist + iNat data with EfficientNet model")
+
+knitr::include_graphics("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024/tree-classification-autoarb_inat-25-genera-1000imgs-effnet2s-10epochs-lr001-march724/confmat.png")
+
+cat("Loss curves for Autoarborist + iNat data with EfficienetNet model")
+
+knitr::include_graphics("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024/tree-classification-autoarb_inat-25-genera-1000imgs-effnet2s-10epochs-lr001-march724/loss.png")
+```
+##### EfficientNetV2s Experiments: Base vs. Augmented (Trained on Combined)
+We find that most genera experience an increase in F1 score for tree genera classification when using increased resolution (and vice versa) and decrease with random crop.
+
+```{r Performance per Genera Combined Augmented}
+# How does performance differ when tested on the Combined dataset with EfficientNetV2s models with 512x512 res (base), 256x256 res, 768x768 res, and RandomCrop only:
+# Filter the data for the 'iNat_AutoArb' dataset from the EfficientNetv2s models trained on the combined dataset
+cnn_results_new_cmb_inataa <- cnn_results_new_cmb %>% filter(TestSet == "iNat_AutoArb")
+
+# Calculate mean F1 scores for Experiments: base_en_cmb, coarser_res, finer_res, random_crop_only
+type <- c("base_en_cmb", "coarser_res", "finer_res", "random_crop_only")
+mean <- lapply(type, function(x){
+  mean(cnn_results_new_cmb_inataa$F1.Score[cnn_results_new_cmb_inataa$Experiment == x])
+})
+
+# Calculate the difference in mean F1 scores
+mean_diff <- lapply(2:length(mean), function(x){
+  mean[[x]] - mean[[1]]
+})
+
+type <- c("coarser res", "finer res", "random crop")
+lapply(seq_along(type), function(x){
+  paste("The average increase in F1 score from base to", type[[x]], "with Combined test data is:", mean_diff[[x]])
+})
+
+# Plot F1 score per class, comparing between ResNet50 and EfficientNet, facet by class
+
+inataa_f1_comparison_plot <- ggplot(cnn_results_new_cmb_inataa, aes(x = Experiment, y = F1.Score, group = Class, color = Class)) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  facet_wrap(~ Class, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  ylim(0, 1) + 
+  labs(x = "Model", y = "F1 Score", title = "F1 Score for Base, Coarser Res, Finer Res, & Random Crop (Combined Test Set)")
+
+# Print the plot
+print(inataa_f1_comparison_plot)
+
+# Confusion matrix - base model
+path <- "Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_april2024/"
+
+fn <- c("base/base_confusion_matrix_all.png", "exp1_reduced_res/exp1_confusion_matrix_all.png", "exp2_increased_res/exp2_confusion_matrix_all.png", "exp3_randomcrop/exp3_confusion_matrix_all.png")
+
+# For each confusion matrix, print the title and the image
+cat("Confusion matrix for Combined Test data with base model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[1]))
+
+# Confusion matrix - coarser resolution model
+cat("Confusion matrix for Combined Test data with coarser resolution model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[2]))
+
+# Confusion matrix - finer resolution model
+cat("Confusion matrix for AutoArborist data with finer resolution model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[3]))
+
+# Confusion matrix - random crop only model
+cat("Confusion matrix for Combined Test data with random crop only model trained on combined datasets")
+knitr::include_graphics(paste0(path,fn[4]))
+```
+
+#### Precision, recall, F1 scores by model and genera
+##### ResNet vs. EfficientNetV2s
+
+Precision, recall, and F1 scores vary across genera quite substantially.
+Genera that appear as palms (e.g., Phoenix, Washingtonia) are consistently classified with high recall, precision, and F1 scores.
+
+```{r Precision, Recall, F1 Per Genera B}
+# Per Class Model Evaluation: Precision, Recall, and F1 Scores Summarized
+
+# Plot model precision per class, facet by model type (Resnet or EfficientNet)
+# Precision = TP / TP + FP
+precision_permodel_plot <- ggplot(filtered_data_inat_autoarb_only, aes(x = Class, y = Precision)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "skyblue") +
+  facet_wrap(~ Model, scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  labs(x = "Class", y = "Precision", title = "Model Precision per Class (iNat + AutoArborist Datasets)")
+
+plot(precision_permodel_plot)
+
+# Plot model recall per class, facet by model type (Resnet or EfficientNet)
+# Recall = TP / TP + FN
+recall_permodel_plot <- ggplot(filtered_data_inat_autoarb_only, aes(x = Class, y = Recall)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "skyblue") +
+  facet_wrap(~ Model, scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  labs(x = "Class", y = "Recall", title = "Model Recall per Class (iNat + AutoArborist Datasets)")
+
+plot(recall_permodel_plot)
+
+# Plot model f1 per class, facet by model type (Resnet or EfficientNet)
+f1_premodel_plot <- ggplot(filtered_data_inat_autoarb_only, aes(x = Class, y = F1.Score)) +
+  geom_bar(stat = "identity", position = "dodge", fill = "skyblue") +
+  facet_wrap(~ Model, scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  labs(x = "Class", y = "F1 Score", title = "Model F1 Score per Class (iNat + AutoArborist Datasets)")
+plot(f1_premodel_plot)
+```
+##### EfficientNetV2s Experiments: Base vs. Augmented (Trained on Combined)
+Precision, recall, and F1 scores vary across genera quite substantially.
+Classes that exhibit boosted performance: e.g., Gleditsia, Juniperus, and Ulmus,
+
+
+```{r Precision, Recall, F1 Per Genera B Augmented}
+# Per Class Model Evaluation: Precision, Recall, and F1 Scores Summarized
+cnn_results_new_aa <- cnn_results_new %>% filter(TestSet == "AutoArborist")
+
+# Plot model precision per class, facet by experiment type (base, coarser_res, finer_res, random_crop_only) tested on AutoArborist dataset
+# Precision = TP / TP + FP
+
+# Subtract the base_en_aa from the other models to get the difference in Precision
+types <- unique(cnn_results_new_aa$Experiment)
+types <- types[types != "base_en_aa"]
+
+aa_diff <- lapply(seq_along(types), function(x){
+  base_aa <- cnn_results_new_aa[cnn_results_new_aa$Experiment == "base_en_aa",]
+  exp <- cnn_results_new_aa[cnn_results_new_aa$Experiment == types[x],]
+  exp$prec_diff <-  exp$Precision - base_aa$Precision
+  exp$rec_diff <-  exp$Recall - base_aa$Recall
+  exp$f1_diff <-  exp$F1.Score - base_aa$F1.Score
+  exp
+})
+aa_diff <- do.call(rbind, aa_diff)
+
+
+# Plot precision difference per class, facet by model type: base (trained on combined), coarser_res, finer_res, random_crop_only
+
+precision_permodel_plot <- ggplot(aa_diff, aes(x = Class, y = prec_diff, fill = prec_diff > 0)) +
+  geom_bar(stat = "identity", position = "dodge") + guides(fill = FALSE) +
+  facet_wrap(~ Experiment, scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  labs(x = "Class", y = "Precision Difference", title = "Precision Difference from Base Model trained on AutoArborist Only")
+
+print(precision_permodel_plot)
+
+# Plot recall difference per class, facet by model type: base (trained on combined), coarser_res, finer_res, random_crop_only
+# Recall = TP / TP + FN
+
+recall_permodel_plot <- ggplot(aa_diff, aes(x = Class, y = rec_diff, fill = rec_diff > 0)) +
+  geom_bar(stat = "identity", position = "dodge") + guides(fill = FALSE) +
+  facet_wrap(~ Experiment, scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  labs(x = "Class", y = "Recall Difference", title = "Recall Difference from Base Model trained on AutoArborist Only")
+
+print(recall_permodel_plot)
+
+# Plot F1 score difference per class, facet by model type: base (trained on combined), coarser_res, finer_res, random_crop_only
+
+f1_premodel_plot <- ggplot(aa_diff, aes(x = Class, y = f1_diff, fill = f1_diff > 0)) +
+  geom_bar(stat = "identity", position = "dodge") + guides(fill = FALSE) +
+  facet_wrap(~ Experiment, scales = "free") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate x-axis labels for better readability
+  labs(x = "Class", y = "F1 Score Difference", title = "F1 Score Difference from Base Model trained on AutoArborist Only")
+
+print(f1_premodel_plot)
+```
+
+
+```{r Genera by Model and Dataset Performance }
+
+# Summarize F1 Scores Per Genus Across the 6 Trained Models and Datasets
+summary_f1_comparision_plot <- ggplot(cnn_results_new, aes(x = Class, y = F1.Score, color = Dataset, shape = Experiment)) +
+  geom_point(position = position_dodge(width = 0.3), size = 3) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Class Genus", y = "F1 Score", title = "F1 Score for each Class Genus across Model-Dataset Combinations")
+
+print(summary_f1_comparision_plot)
+
+```
+
+
+### Domain Transfer {.tabset}
+
+#### AutoArborist to iNaturalist
+
+How well does a model trained on AutoArborist imagery predict tree genera from the iNaturalist dataset?
+
+AutoArborist images contain tree genera captured from Google Street View images.
+
+iNaturalist images contain diverse representations of tree genera (e.g., leaves, flowers, fruits, bark).
+
+This difference in image perspective may cause distribution shifts in models and lead to worse performance for certain genera when trained jointly.
+
+We select images from iNaturalist that are predicted with high probability of a tree genera.
+
+```{r}
+
+# Model trained on AutoArborist images and applied to iNaturalist images: Z:\auto_arborist_cvpr2022_v0.15\analyses\tree_classification\pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024\tree-classification-autoarb-25-genera-1000imgs-effnet2s-10epochs-lr001-march724\last.pth
+
+# Contains Genus, Image Name image.jpeg, or image.jpg), and Softmax.Probability scores
+inat_pred_genus <- read.csv("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/pytorch_cnn_classifier_autoarborist_inaturalist_experiments_march2024/autoarborist_predicted_on_inat_10kimgs_genus_image_probability_scores_march2024.csv")
+
+inat_10k_data = "Z:/auto_arborist_cvpr2022_v0.15/data/tree_classification/inat/images/original_10k"
+
+# Combine 'inat_data_training' path with 'Image' column to get full file string paths to each image
+# Combine base path with image names in 'Image' column
+inat_pred_genus$Full_Image_Path <- paste(inat_10k_data, inat_pred_genus$Genus, inat_pred_genus$Image, sep = "/")
+
+print("Images from iNaturalist predicted with different probabilities.")
+
+# View the updated data frame with full file paths
+head(inat_pred_genus)
+
+
+```
+
+
+```{r}
+
+print("Out of 10k images per genus from iNaturalist, most images are predicted with low probability.")
+
+# Create histograms of predicted probabilites faceted by genus
+ggplot(inat_pred_genus, aes(x = Softmax.Probability)) +
+  geom_histogram(binwidth = 0.05, fill = "skyblue", color = "black") +
+  facet_wrap(~ Genus, scales = "free") +
+  theme_classic() + 
+  theme(axis.text.x = element_text(size = 8, angle = 90)) + 
+  labs(title = "AutoArborist Model Predicted on 10k iNat Images by Genus - Probabilities",
+       x = "Softmax Probability",
+       y = "Frequency")
+
+
+
+```
+
+
+```{r}
+
+print("Out of 10k images per genus, the average predicted probability from the Autoarborist model.")
+
+# Calculate average softmax probability value for each genus
+average_prob_by_genus <- inat_pred_genus %>%
+  group_by(Genus) %>%
+  summarise(avg_prob = mean(Softmax.Probability))
+
+print(average_prob_by_genus, n=25)
+
+# Merge average probabilities back into the original data
+inat_pred_genus <- merge(inat_pred_genus, average_prob_by_genus, by = "Genus", all.x = TRUE)
+
+# Subset the data by taking, for each genus, only rows above the average softmax probability
+subset_images_above_avg <- inat_pred_genus %>%
+  filter(Softmax.Probability > avg_prob)
+
+# View the subsetted data
+#head(subset_images_above_avg)
+
+
+```
+
+
+```{r}
+
+# Sort the data by genus and softmax probability
+sorted_data <- inat_pred_genus %>%
+  arrange(Genus, desc(Softmax.Probability))
+
+# Group by genus and select top 100 rows for each genus
+top_100_per_genus <- sorted_data %>%
+  group_by(Genus) %>%
+  slice_head(n = 100)
+
+# Extract full file paths of the top 10 images for each genus
+top_100_paths <- top_100_per_genus$Full_Image_Path
+
+# View the full file paths of the top 10 images for each genus
+#head(top_100_paths)
+
+
+# Group by genus and select bottom 100 rows for each genus
+bottom_100_per_genus <- sorted_data %>%
+  group_by(Genus) %>%
+  slice_tail(n = 100)
+
+# Extract full file paths of the bottom 100 images for each genus
+bottom_100_paths <- bottom_100_per_genus$Full_Image_Path
+
+# View the full file paths of the bottom 100 images for each genus
+#head(bottom_100_paths)
+
+
+```
+
+### iNat: Top 10 Prob. Images Per Genus {.tabset}
+
+```{r}
+
+# Display top 100 Softmax.Probability images by Full_Image_Path for each genus from the inat_pred_genus dataframe
+
+print("")
+
+# Function to read and display images
+display_images <- function(paths) {
+  images <- lapply(paths, jpeg::readJPEG)
+  grid.arrange(grobs = lapply(images, function(x) rasterGrob(x)))
+}
+
+# Subset the top 10 Softmax Probability images for each genus
+top_10_per_genus <- top_100_per_genus %>%
+  group_by(Genus) %>%
+  slice_head(n = 10)
+
+# Display the top 10 images for each genus
+for (genus in unique(top_10_per_genus$Genus)) {
+  cat("Genus:", genus, "\n")
+  top_10_images <- top_10_per_genus %>%
+    filter(Genus == genus) %>%
+    pull(Full_Image_Path)
+  display_images(top_10_images)
+  cat("\n")
+}
+
+
+
+
+
+```
+
+### iNat: Bottom 10 Prob. Images Per Genus {.tabset}
+
+```{r}
+
+# Display bottom 10 Softmax.Probability images by Full_Path for each genus from the inat_pred_genus dataframe
+
+# Function to read and display images
+display_images <- function(paths) {
+  images <- lapply(paths, jpeg::readJPEG)
+  grid.arrange(grobs = lapply(images, function(x) rasterGrob(x)))
+}
+
+# Subset the bottom 10 Softmax Probability images for each genus
+bottom_10_per_genus <- bottom_100_per_genus %>%
+  group_by(Genus) %>%
+  slice_head(n = 10)
+
+# Display the bottom 10 images for each genus
+for (genus in unique(bottom_10_per_genus$Genus)) {
+  cat("Genus:", genus, "\n")
+  bottom_10_images <- bottom_10_per_genus %>%
+    filter(Genus == genus) %>%
+    pull(Full_Image_Path)
+  display_images(bottom_10_images)
+  cat("\n")
+}
+
+
+
+```
+
+```{r, eval=FALSE}
+
+# Move Top 100 Predicted Images to New Folder:
+# 
+# # Define the target folder path
+# target_folder <- "C:/Users/talake2/Desktop/auto_arborist_cvpr2022_v015/pytorch_cnn_classifier/pytorch_cnn_autoarborist_inaturalist_models_march2024/inat_images_top100_softmax_predicted_from_autoarborist"
+# 
+# # Create the target folder if it doesn't exist
+# if (!file.exists(target_folder)) {
+#   dir.create(target_folder)
+# }
+# 
+# # Loop through each genus
+# for (genus in unique(top_100_per_genus$Genus)) {
+#   # Create a folder for the genus if it doesn't exist
+#   genus_folder <- file.path(target_folder, genus)
+#   if (!file.exists(genus_folder)) {
+#     dir.create(genus_folder)
+#   }
+#   
+#    # Filter top 100 images for the current genus
+#   genus_top_100 <- top_100_per_genus %>%
+#     filter(Genus == genus)
+#   
+#   # Copy images to the genus folder
+#   for (i in 1:nrow(genus_top_100)) {
+#     file.copy(from = genus_top_100$Full_Image_Path[i],
+#               to = file.path(genus_folder, basename(genus_top_100$Full_Image_Path[i])))
+#   }
+# }
+
+
+```
+
+### Experiment Results {.tabset}
+
+#### Performance by genera
+
+Model precision, recall, and F1 score varies by tree genus.
+
+```{r Summary per Genera}
+
+# Read in results .csv file containing per-class precision, recall metrics for cnn models
+cnn_results <- read.csv("Z:/auto_arborist_cvpr2022_v0.15/analyses/tree_classification/r_markdowns/Model_Eval_Metrics_Per_Genus_Summary_S24.csv")
+
+cat("Across models, the average precision, recall, and F1 scores for tree genera")
+
+# Overall model summary per genera:
+genera_summary <- cnn_results %>%
+  group_by(Class) %>%
+  summarize(
+    Avg_Precision = mean(Precision),
+    Avg_Recall = mean(Recall),
+    Avg_F1_Score = mean(F1.Score)
+  )
+
+# Summary of performance metrics per genera
+print(genera_summary, n=30)
+
+# Sort genera_summary by ascending average F1 score
+genera_summary_sorted <- genera_summary %>%
+  arrange(desc(Avg_F1_Score))
+
+cat("Sorted by descending F1 score:")
+
+# View the sorted summary
+print(genera_summary_sorted, n=30)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

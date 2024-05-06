@@ -1,13 +1,11 @@
 # Setup libraries & paths
 library(data.table)
 library(aws.s3)
-path <- "~/Desktop/inat/" # change to your root folder
+path <- "C:/Users/talake2/Desktop/auto_arborist_cvpr2022_v015/pytorch_cnn_classifier/datasets/inat/" # change to your root folder for iNaturalist images
 
 # Load autoarborist genera data
 aa <- fread(paste0(path, "autoarborist/aa_sumstats.csv"))
 # Drop unnecessary columns
-aa[, V3 := NULL]
-aa[, V4 := NULL]
 names(aa)[names(aa) == "count"] <- "total_aa_imgs"
 
 # 1. Download aws open data
@@ -89,9 +87,9 @@ observations[, quality_grade := NULL]
 observations[, active := NULL]
 
 # Write out global observations on aa genera
-fwrite(observations, paste0(path, "metadata/tree_observations_global.csv"),
-  row.names = FALSE
-)
+#fwrite(observations, paste0(path, "metadata/tree_observations_global.csv"),
+#  row.names = FALSE
+#)
 
 # Filter observations to only include US/CANADA
 observations_global <- observations
@@ -112,16 +110,17 @@ aa <- merge(aa, observations_counts, by = "genus", all.x = TRUE)
 aa <- merge(aa, observations_counts_global, by = "genus", all.x = TRUE)
 
 # Write out autoarborist
-fwrite(aa, paste0(path, "aa_inat_noimgs.csv"), row.names = FALSE)
+#fwrite(aa, paste0(path, "aa_inat_noimgs.csv"), row.names = FALSE)
 
 # Subset genera for download
-small_set <- c(
-  "phoenix", "washingtonia", "pinus", "picea",
-  "juniperus", "thuja", "sequoia", "pseudotsuga", "taxodium", "acer",
-  "fraxinus", "quercus", "ulmus", "tilia", "pyrus", "gleditsia", "magnolia",
-  "betula", "ailanthus", "citrus", "juglans", "prunus", "rhus", "erythrina",
-  "cupaniopsis"
-)
+
+#small_set <- c(
+#  "phoenix", "washingtonia", "pinus", "picea",
+#  "juniperus", "thuja", "sequoia", "pseudotsuga", "taxodium", "acer",
+#  "fraxinus", "quercus", "ulmus", "tilia", "pyrus", "gleditsia", "magnolia",
+#  "betula", "ailanthus", "citrus", "juglans", "prunus", "rhus", "erythrina",
+#  "cupaniopsis"
+#)
 
 # Use lapply to filter observations by small_set
 
@@ -131,17 +130,17 @@ subset_obs <- lapply(small_set, function(x) {
 subset_obs <- rbindlist(subset_obs, fill = TRUE)
 
 # Write out subset_obs
-fwrite(subset_obs, paste0("metadata/subset_treeobs_uscan.csv"), row.names = FALSE)
+#fwrite(subset_obs, paste0(path, "metadata/subset_treeobs_uscan_autoarborist.csv"), row.names = FALSE)
 
 # Create directories for images
 subset_obs$folder_name <- paste0("/", subset_obs$genus, "/")
 subset_obs[name == "Ailanthus altissima", ]$folder_name <- "/ailanthus_altissima/"
-subset_obs[name == "Juglans nigra", ]$folder_name <- "/juglans_nigra/"
+#subset_obs[name == "Juglans nigra", ]$folder_name <- "/juglans_nigra/"
 
 classes <- unique(subset_obs$folder_name)
 
 lapply(classes, function(x) {
-  dir.create(paste0(path, "/images/original/", x),
+  dir.create(paste0(path, "/images/original_full/", x),
     recursive = TRUE,
     showWarnings = FALSE
   )
@@ -153,31 +152,52 @@ subset_obs$s3filepath <- paste0(
   subset_obs$extension
 )
 subset_obs$dlpath <- paste0(
-  path, "images/original", subset_obs$folder_name,
+  path, "images/original_full", subset_obs$folder_name,
   subset_obs$photo_id, ".",
   subset_obs$extension
 )
+
+
+# 4. Download aws open data
+
+# Function to check if file exists
+file_exists <- function(path) {
+  fs::file_exists(path)
+}
+
 # 4. Download aws open data
 
 # Filter and download the first 1000 images per class
 lapply(classes, function(x) {
-  imgs1k <- subset_obs[folder_name == x, ][1:1000, ]
+  imgs1k <- subset_obs[folder_name == x, ]
   inat_bucket <- "s3://inaturalist-open-data/"
-
+  
   lapply(1:nrow(imgs1k), function(i) {
     item <- imgs1k$s3filepath[i]
     dlpath <- imgs1k$dlpath[i]
-
-    save_object(
-      object = item,
-      bucket = inat_bucket,
-      region = "us-east-1",
-      file = dlpath
-    )
+    
+    # Check if file exists locally
+    if (!file_exists(dlpath)) {
+      tryCatch(
+        expr = {
+          save_object(
+            object = item,
+            bucket = inat_bucket,
+            region = "us-east-1",
+            file = dlpath
+          )
+        },
+        error = function(e) {
+          # Handle the error gracefully
+          cat("Error downloading object:", item, "\n")
+          cat("Error message:", conditionMessage(e), "\n")
+        }
+      )
+    } else {
+      cat("File already exists. Skipping download for:", dlpath, "\n")
+    }
   })
 })
 
-#' To do:
-#' 1. Update 4. to check if images already exist in the folder if they do,
-#' skip download, if not, download.
-#' 2. Convert script into markdown file (or python script if gsv_detector converted into pkg)
+# EOF
+
