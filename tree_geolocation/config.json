@@ -1,0 +1,8 @@
+{
+    "experiment": "my-experiment-name",
+	"gsv_img_folder": "C:\\Users\\talake2\\Desktop\\tree-geolocation\\geolocation-panos-testing-tiny\\sioux-falls",
+	"output_path": "C:\\Users\\talake2\\Desktop\\tree_geolocation\\model_outputs\\my_experiment_output_path",
+	"yolo_model_path": "C:\\Users\\talake2\\Desktop\\auto_arborist_cvpr2022_v015\\yolov5\\runs\\train\\tree-detector-yolov5x-oct2323-autoarborist-25epochs\\weights\\last.pt",
+	"classifier_path": "D:\\blaginh\\tree_classification\\model_outputs\\exp5_curated_top1000_20epochs\\tree-classification-autoarb_inat-25-genera-1000imgs-effnet2s-20epochs-lr001-cur-may2224.pth",
+    "selected_genera": ["acer","ailanthus","betula","citrus","cupaniopsis","erythrina","fraxinus","gleditsia","juglans","juniperus","magnolia","phoenix","picea","pinus","prunus","pseudotsuga","pyrus","quercus","rhus","sequoia","taxodium","thuja","tilia","ulmus","washingtonia"]
+}
