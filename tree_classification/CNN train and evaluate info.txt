@@ -1,0 +1,15 @@
+# Export Python Path to Parent Directory of Tree_Classification Folder
+Ex in Bash; export PYTHONPATH=$PYTHONPATH:/c/users/talake2/desktop
+
+# Load Conda Environment with Torch
+source activate tensorflow_210
+
+# Inspect train_config.json File to Specify Training Parameters
+
+# Run Train.py to Train CNN
+python -m tree_classification.train --config "C:\Users\talake2\Desktop\tree_classification\train_config.json"
+
+# Inspect eval_config.json File to Specify Evaluation Parameters
+
+# Run Evaluate.py to Evaluate CNN
+python -m tree_classification.evaluate --config "C:\Users\talake2\Desktop\tree_classification\eval_config.json"
