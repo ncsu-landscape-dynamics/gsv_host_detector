@@ -12,6 +12,7 @@ import sys
 import json
 import pandas as pd
 import numpy as np
+import geopandas as gpd
 from math import radians, degrees, sin, cos, asin, atan2
 from shapely.geometry import Point, LineString
 from skimage.io import imread
@@ -32,12 +33,6 @@ def load_config(config_path: str) -> dict:
     return config
 
 
-def create_output_directory(output_path: str) -> None:
-    """Create output directory if it does not exist."""
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-
-
 def load_yolo_model(yolo_model_path: str) -> torch.nn.Module:
     """Load the YOLO model."""
     model = torch.hub.load(
@@ -48,7 +43,6 @@ def load_yolo_model(yolo_model_path: str) -> torch.nn.Module:
     )
     model.conf = 0.25
     return model
-
 
 def load_zoedepth_model() -> torch.nn.Module:
     """Load the ZoeDepth model."""
@@ -217,6 +211,66 @@ def process_yolo_results(model_results_df, num_detections):
 
     return topN_filtered
 
+
+def predict_genus_cnn(img, model, genera, xmin, ymin, xmax, ymax):
+    '''
+    Function to apply a trained CNN model to classify trees detected in street view imagery.
+    Classifies without TenCrop.
+    Takes in a panoramic street view image, applies transformations (resize, normalize) and runs prediction.
+    Returns the most likely class prediction (argmax) and a dictionary of the predicted class probabilities.
+    '''
+    # Genera to detect in google street view images
+    selected_genera = genera
+
+    # Crop image to detected tree bounding box
+    crop_img = img[ymin:ymax, xmin:xmax, ...]
+
+    # Check if image is at least 512 x 512 to run predictions
+    # Create larger bounding box around detected tree if dimensions are too small
+    if crop_img.shape[0] < 512:
+        print("Re-cropping image to meet required dimensions: 512 x 512")
+        ymin = max(0, ymin - (512 - crop_img.shape[0]) // 2)
+        ymax = ymin + 512
+        crop_img = img[ymin:ymax, xmin:xmax, ...]
+
+    if crop_img.shape[1] < 512:
+        print("Re-cropping image to meet required dimensions: 512 x 512")
+        xmin = max(0, xmin - (512 - crop_img.shape[1]) // 2)
+        xmax = xmin + 512
+        crop_img = img[ymin:ymax, xmin:xmax, ...]    
+
+    # Define transformations
+    transform = transforms.Compose([
+        transforms.ToPILImage(),  # Convert to PIL Image
+        transforms.Resize((512, 512)),  # Resize image to 512x512
+        transforms.ToTensor(),  # Convert to tensor
+        transforms.Normalize(mean=(0.5046, 0.5396, 0.4885), std=(0.2176, 0.2147, 0.2471))  # Normalize the image
+    ])
+
+    # Apply transformations
+    transformed_img = transform(crop_img)
+
+    # Run CNN model prediction on the transformed image
+    transformed_img_tensor = transformed_img.unsqueeze(0).cuda()  # add first dimension of batch size and push to GPU
+    output = model(transformed_img_tensor)
+
+    # Get the softmax class probability for each genus
+    class_probs = torch.softmax(output, dim=1)
+
+    # Get the argmax predicted class
+    class_argmax = torch.argmax(output).item()
+
+    # From predicted class index, get genus name
+    predicted_tree_genus = selected_genera[class_argmax]
+
+    # Initialise a dictionary to hold the output genus probabilities
+    genus_softmax_dict = {}
+    for i, genus in enumerate(selected_genera):
+        genus_softmax_dict[f'{genus}_prob'] = class_probs[0][i].item()
+
+    return predicted_tree_genus, genus_softmax_dict
+
+
 def predict_genus_tencrop_cnn(img, model, genera, xmin, ymin, xmax, ymax):
     '''
     Function to apply a trained CNN model to classify trees detected in street view imagery.
@@ -298,7 +352,7 @@ def process_image(img_folder: str, img_name: str, tree_model: torch.nn.Module, z
     model_results_df = model_results.pandas().xyxy[0] 
     
     # Subset trees from YOLO model by detection heuristics: bounding box size, aspect ratio, confidence
-    top_detection_results = process_yolo_results(model_results_df, 3)
+    top_detection_results = process_yolo_results(model_results_df, 3) # Select top 3 detections by area, aspect ratio, and confidence
     logging.info(top_detection_results)
 
     if top_detection_results is None:
@@ -311,12 +365,19 @@ def process_image(img_folder: str, img_name: str, tree_model: torch.nn.Module, z
 
     tree_geolocation_results = []
 
-    for _, row in top_detection_results.iterrows():
+    for index, row in top_detection_results.iterrows():
         # Get bounding box for detected tree in the image
         xmin, ymin, xmax, ymax = int(row['xmin']), int(row['ymin']), int(row['xmax']), int(row['ymax'])
         
         # Run Ten-Crop CNN Model Classification on Detected Tree
-        predicted_genus, genus_softmax_dict = predict_genus_tencrop_cnn(img, classifier, selected_genera, xmin, ymin, xmax, ymax)
+        predicted_genus, genus_softmax_dict = predict_genus_cnn(img, classifier, selected_genera, xmin, ymin, xmax, ymax)
+
+        # Save predicted image
+        #crop_img = img[ymin:ymax, xmin:xmax, ...]
+        #filename = f"C:/users/talake2/Desktop/tree-geolocation-exp/prediction-images/{predicted_genus}-{pano_id}-{index}.jpg"
+        #plt.imshow(crop_img)
+        #plt.savefig(filename)
+        #plt.close()
 
         # Crop the depth map to the tree matched from panoramic image to inventory
         cropped_depth = metric_depth_resized_zoe[ymin:ymax, xmin:xmax]
@@ -352,3 +413,120 @@ def process_image(img_folder: str, img_name: str, tree_model: torch.nn.Module, z
     return pd.DataFrame(tree_geolocation_results)
     
 
+def find_intersections(combined_geolocation_lines, tolerance=1e-6):
+    """
+    Identifies intersections between lines and averages classification probabilities if they intersect.
+
+    Parameters:
+    combined_geolocation_lines (GeoDataFrame): DataFrame containing lines and associated metadata.
+    tolerance (float): Tolerance for intersection checks to exclude origins.
+
+    Returns:
+    GeoDataFrame: A GeoDataFrame containing intersection points and averaged classification probabilities.
+    """
+    
+    # Initialize an empty DataFrame for triangulated tree detections
+    triangulated_tree_detections = pd.DataFrame(columns=[
+        'Intersection', 'Pano_ID_1', 'Pano_Origin_Lon_1', 'Pano_Origin_Lat_1', 'Est_Depth_1', 
+        'Pano_ID_2', 'Pano_Origin_Lon_2', 'Pano_Origin_Lat_2', 'Est_Depth_2'
+    ])
+    
+    # Iterate through all detected and classified trees and triangulate detected trees
+    for i in range(len(combined_geolocation_lines)):
+        origin = combined_geolocation_lines.geometry[i].coords[0]
+        for j in range(i + 1, len(combined_geolocation_lines)):
+            if combined_geolocation_lines.geometry[i].intersects(combined_geolocation_lines.geometry[j]):
+                intersection_point = combined_geolocation_lines.geometry[i].intersection(combined_geolocation_lines.geometry[j])
+                if (abs(intersection_point.x - origin[0]) > tolerance or abs(intersection_point.y - origin[1]) > tolerance) and \
+                   (abs(intersection_point.x - combined_geolocation_lines.geometry[j].coords[0][0]) > tolerance or 
+                    abs(intersection_point.y - combined_geolocation_lines.geometry[j].coords[0][1]) > tolerance):
+                    
+                    pano_i = combined_geolocation_lines.iloc[i]
+                    pano_j = combined_geolocation_lines.iloc[j]
+                    
+                    # Get Pano ID and Location For Intersection Points
+                    output_data = {
+                        'Intersection': intersection_point,
+                        'Pano_ID_1': pano_i['Pano_ID'], 
+                        'Pano_Origin_Lon_1': pano_i['Pano_Origin_Lon'], 
+                        'Pano_Origin_Lat_1': pano_i['Pano_Origin_Lat'], 
+                        'Est_Depth_1': pano_i['Est_Depth'],
+                        'Pano_ID_2': pano_j['Pano_ID'], 
+                        'Pano_Origin_Lon_2': pano_j['Pano_Origin_Lon'], 
+                        'Pano_Origin_Lat_2': pano_j['Pano_Origin_Lat'], 
+                        'Est_Depth_2': pano_j['Est_Depth']
+                    }
+                    
+                    # Get the class probabilities for panos i and j
+                    pano_i_genus_probs = combined_geolocation_lines.iloc[i, 10:35]
+                    pano_j_genus_probs = combined_geolocation_lines.iloc[j, 10:35]
+                    
+                    # Average the two predicted tree class probabilities
+                    combined_probs = pano_i_genus_probs.add(pano_j_genus_probs)
+                    average_genus_probs = combined_probs / 2
+                    
+                    # Convert average_genus_probs to a dictionary and unpack into the output DataFrame
+                    output_data.update(average_genus_probs.to_dict())
+                    
+                    triangulated_tree_detections = pd.concat([triangulated_tree_detections, pd.DataFrame([output_data])], ignore_index=True)
+    
+    # Convert triangulated tree intersections to a GeoDataFrame
+    intersection_geometry = [Point(xy) for xy in triangulated_tree_detections['Intersection']]
+    triangulated_tree_detections_gdf = gpd.GeoDataFrame(triangulated_tree_detections, geometry=intersection_geometry, crs="EPSG:4326")
+    
+    return triangulated_tree_detections_gdf
+    
+    
+    
+def filter_intersections(triangulated_tree_detections_gdf, tree_points_kdtree, max_distance=5):
+    """
+    Filters intersections based on the distance between estimated tree locations.
+
+    Parameters:
+    triangulated_tree_detections_gdf (GeoDataFrame): DataFrame containing intersection points and metadata.
+    tree_points_kdtree (scipy.spatial.cKDTree): KDTree for efficient nearest-neighbor lookup.
+    max_distance (float): Maximum distance (in meters) to search for intersections near estimated tree locations.
+
+    Returns:
+    GeoDataFrame: A filtered GeoDataFrame with unique intersection points and predicted genus.
+    """
+    
+    filtered_intersections = []
+    assigned_positions = {}
+    
+    for point in range(len(triangulated_tree_detections_gdf.geometry)):
+        intersection_point = triangulated_tree_detections_gdf.geometry[point]
+        distances, indices = tree_points_kdtree.query((intersection_point.x, intersection_point.y), 2)
+        distances_meters = distances * 111139  # Convert distances to meters
+        
+        for i, index in enumerate(indices):
+            if distances_meters.max() <= max_distance:
+                if index in assigned_positions:
+                    if distances_meters[i] < assigned_positions[index]['distance']:
+                        assigned_positions[index] = {'distance': distances_meters[i], 'intersection': intersection_point}
+                else:
+                    assigned_positions[index] = {'distance': distances_meters[i], 'intersection': intersection_point}
+    
+    for _, info in assigned_positions.items():
+        if info['intersection'] not in filtered_intersections:
+            filtered_intersections.append(info['intersection'])
+
+    df_intersections_filtered = pd.DataFrame([(point.x, point.y) for point in filtered_intersections], columns=['Lon', 'Lat'])
+
+    print(f"Intersections before filtering:", len(triangulated_tree_detections_gdf.geometry))
+    print(f"Intersections after filtering:", len(filtered_intersections))
+
+    filtered_intersections_series = gpd.GeoSeries(filtered_intersections)
+    filtered_tree_detections_gdf = triangulated_tree_detections_gdf[triangulated_tree_detections_gdf['geometry'].isin(filtered_intersections_series)]
+    
+    filtered_intersection_geometry = [Point(xy) for xy in filtered_tree_detections_gdf['Intersection']]
+    filtered_triangulated_tree_detections_gdf = gpd.GeoDataFrame(filtered_tree_detections_gdf, geometry=filtered_intersection_geometry, crs="EPSG:4326")
+    
+    predicted_classes = filtered_triangulated_tree_detections_gdf.iloc[:, 9:34].idxmax(axis=1)
+    predicted_classes = predicted_classes.apply(lambda x: x.split('_')[0])
+    filtered_triangulated_tree_detections_gdf['predicted_genus'] = predicted_classes
+    
+    filtered_triangulated_tree_detections_gdf['latitude'] = filtered_triangulated_tree_detections_gdf.geometry.y
+    filtered_triangulated_tree_detections_gdf['longtiude'] = filtered_triangulated_tree_detections_gdf.geometry.x
+    
+    return filtered_triangulated_tree_detections_gdf
