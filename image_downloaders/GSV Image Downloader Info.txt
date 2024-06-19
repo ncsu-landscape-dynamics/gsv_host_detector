@@ -1,0 +1,22 @@
+# To search and download GSV panoramic images, a user must first setup a Google Cloud account and obtain a 'Street View Static API' key.
+
+# Export Python Path to Parent Directory of image_downloader folder
+Ex in Bash; export PYTHONPATH=$PYTHONPATH:/c/users/talake2/desktop
+
+# Load Conda Environment
+source activate ox
+
+# Inspect config.json file to specify downloading parameters
+
+{
+    "api_key_path": "Z:\\auto_arborist_cvpr2022_v0.15\\api_keys\\Google_Street_View_Static_API_Key_Private_LakeT.txt",
+	"latitude": "38.50500615673824",
+	"longitude": "-122.46982548134353",
+	"radius": "5",
+	"distance": "200",
+	"output_path": "C:\\users\\talake2\\desktop\\image_downloaders\\gsv_images"
+}
+
+
+# Run Get_GSV_Panos_API.py to geolocate trees
+python -m image_downloaders.get_panos.api --config "C:\Users\talake2\Desktop\image_downloaders\config.json"
