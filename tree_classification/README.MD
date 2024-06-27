@@ -34,3 +34,6 @@ python -m tree_classification.evaluate --config "/path/to/eval_config.json"
 
 ### Additional Information
 For detailed information on model performance and other analyses, refer to the Jupyter notebooks and R markdown files available in the jupyter_notebooks and r_markdowns directories, respectively.
+
+### Geopriors
+The `/geopriors` directory contains exploratory analyses to modify CNN predictions based on prior information about exisitng tree genera in a geographic region.
