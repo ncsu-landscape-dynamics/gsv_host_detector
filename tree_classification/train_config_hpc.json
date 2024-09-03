@@ -1,0 +1,15 @@
+{
+    "experiment": "exp-test-hpc",
+	"output_path": "/share/rkmeente/talake2/tmp/exp_test_hpc",
+	"model_path": "",
+    "train_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/training_dataset_small_march624",
+    "test_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624",
+    "test_data_dir_aa": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624",
+    "test_data_dir_inat": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624",
+    "batch_size": 64,
+    "epochs": 10,
+    "learning_rate": 0.001,
+    "lr_patience": 5,
+    "es_patience": 10,
+    "selected_genera": ["acer", "ailanthus", "betula", "citrus", "cupaniopsis", "erythrina", "fraxinus", "gleditsia", "juglans", "juniperus", "magnolia", "phoenix", "picea", "pinus", "prunus", "pseudotsuga", "pyrus", "quercus", "rhus", "sequoia", "taxodium", "thuja", "tilia", "ulmus", "washingtonia"]
+}
