@@ -1,0 +1,107 @@
+Setup for Training CNNs on NCSU's HPC
+
+***************************************
+Install Pytorch in a Conda Environment
+***************************************
+ 
+Assume that your group has a directory under /usr/local/usrapps that you can install apps.
+Assume that you have initialized conda in your environment. If not yet, then you need to visit HPC conda documentation at https://hpc.ncsu.edu/Software/Apps.php?app=Conda to learn generally how to use conda on HPC.
+Assume the installation location is /usr/local/usrapps/abcxyz/conda_envs/pytorch.
+Then, do the following to create a conda environment there and then install Pytorch in that conda environment.
+ 
+conda create --prefix /usr/local/usrapps/abcxyz/conda_envs/pytorch pip
+ 
+conda activate /usr/local/usrapps/abcxyz/conda_envs/pytorch
+ 
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+ 
+conda deactivate
+ 
+The installation part "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124" will take a long time to complete.
+ 
+
+
+****************************************************************
+Modify Python and JSON files to Run CNNs
+1. train_hpc.py contains Python code necessary to train an CNN
+2. train_config_hpc.json contains arguments to train the CNN
+****************************************************************
+
+In your /home directory, use GitHub to pull the tree classification module
+https://github.com/ncsu-landscape-dynamics/gsv_host_detector
+
+Modify the train_config_hpc.json file arguments for your model run.
+
+(base) [talake2@login02 tree_classification]$ cat train_config_hpc.json 
+{
+    "experiment": "exp-test-hpc-2",
+        "output_path": "/share/rkmeente/talake2/tmp/exp_test_hpc-2",
+        "model_path": "",
+    "train_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/training_dataset_small_march624",
+    "test_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624",
+    "test_data_dir_aa": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624",
+    "test_data_dir_inat": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/testing_dataset_small_march624",
+    "batch_size": 128,
+    "epochs": 10,
+    "learning_rate": 0.001,
+    "lr_patience": 5,
+    "es_patience": 10,
+    "selected_genera": ["acer", "ailanthus", "betula", "citrus", "cupaniopsis", "erythrina", "fraxinus", "gleditsia", "juglans", "juniperus", "magnolia", "phoenix", 
+"picea", "pinus", "prunus", "pseudotsuga", "pyrus", "quercus", "rhus", "sequoia", "taxodium", "thuja", "tilia", "ulmus", "washingtonia"]
+}
+
+
+
+The shell script 'run_hpc_tree_classification_cnn.sh' contains commands to run the python train_hpc.py script
+
+[talake2@login02 tree_classification]$ cat run_hpc_tree_classification_cnn.sh 
+#!/bin/bash
+#BSUB -n 4
+#BSUB -W 3000
+#BSUB -J test_cnn
+#BSUB -o stdout.%J
+#BSUB -e stderr.%J
+#BSUB -q gpu
+#BSUB -R span[hosts=1]
+#BSUB -R "select[h100]"
+#BSUB -gpu "num=1:mode=shared:mps=no"
+#BSUB -R rusage[mem=64GB]
+
+# Load conda and activate your environment
+module load conda
+source activate /usr/local/usrapps/rkmeente/talake2/pytorch_env
+export PYTHONPATH=$PYTHONPATH:/home/talake2
+
+# Run the training script
+python -m tree_classification.train_hpc --config "/home/talake2/tree_classification/train_config_hpc.json"
+conda deactivate
+
+
+
+*************************
+Submit the model to HPC
+*************************
+
+bsub < run_hpc_tree_classification_cnn.sh 
+bjobs # inspect job status
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
