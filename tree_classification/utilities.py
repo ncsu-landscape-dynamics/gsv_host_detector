@@ -60,8 +60,6 @@ def image_summary_statistics(image_root):
     
     Example:
     
-    image root = r"D:\...\training_data_inat"
-    
     Processing directories: 26it [29:13, 67.44s/it]
     Average Mean: tensor([0.5046, 0.5397, 0.4886])
     Average Std: tensor([0.2176, 0.2148, 0.2471])
