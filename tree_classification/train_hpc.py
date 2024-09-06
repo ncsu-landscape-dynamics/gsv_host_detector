@@ -122,7 +122,7 @@ def main():
         v2.CenterCrop(size=(768, 768)),
         v2.Resize(size=(512, 512), antialias=True),
         v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=(0.5046, 0.5396, 0.4885), std=(0.2176, 0.2147, 0.2471))
+        v2.Normalize(mean=(0.5712, 0.6121, 0.5827), std=(0.2224, 0.2136, 0.2586))
     ])
 
     # Create Image Folder Datasets
