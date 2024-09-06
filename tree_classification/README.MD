@@ -14,6 +14,8 @@ In the `/tree_classification` directory, you will find the following key scripts
 - **train_config.json**: Configuration file for training parameters.
 - **eval_config.json**: Configuration file for evaluation parameters.
 
+Note: files with *hpc are for running on a high performance compute cluster.
+
 ## Usage
 
 ### 1. Export Python Path
