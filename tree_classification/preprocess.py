@@ -2,57 +2,6 @@
 
 """
 The preprocessing module contains functions to create datasets for training and testing, export metadata to csv, and print directory information.
-
-Usage:
-
-# Constants
-selected_genera = ['acer','ailanthus','betula','citrus','fraxinus','gleditsia','juglans','juniperus', 'magnolia','phoenix','picea',
-                   'pinus','prunus','pseudotsuga','pyrus','quercus','rhus','sequoia','taxodium', 'thuja','tilia','ulmus','washingtonia']
-
-training_ratio = 0.9 # ratio of training images to total images
-
-max_training_images = 1187 # maximum number of training images to select
-max_testing_images = 132 # maximum number of testing images to select
-
-# Source: contains all available street view images of tree genera from Autoarborist
-source_root = r"Z:\auto_arborist_cvpr2022_v0.15\data\autoarborist_original_data\autoarborist_original_jpegs\jpegs_streetlevel_genus_idx_label"
-
-# Target: location for images of tree genera as training data 
-training_destination_root = r"Z:\auto_arborist_cvpr2022_v0.15\data\tree_classification\autoarborist\training_dataset_small_apr624"
-
-# Target: location for images of tree genera as testing data 
-testing_destination_root = r"Z:\auto_arborist_cvpr2022_v0.15\data\tree_classification\autoarborist\testing_dataset_small_apr624"
-
-# Existing Target: location for existing images of tree genera as training data used in previous experiments
-existing_training_root = r"Z:\auto_arborist_cvpr2022_v0.15\data\tree_classification\autoarborist\training_dataset_small_march624"
-
-# Existing Target: location for existing images of tree genera as testing data used in previous experiments
-existing_testing_root = r"Z:\auto_arborist_cvpr2022_v0.15\data\tree_classification\autoarborist\testing_dataset_small_march624"
-
-# Append: logical statement to append new images to existing training and testing data
-append = True
-
-# CSV path: location to save the CSV file containing the training and testing data
-csv_path = r"Z:\auto_arborist_cvpr2022_v0.15\data\tree_classification\autoarborist"
-
-# Select all genera
-selected_genera = os.listdir(source_root)
-
-create_datasets(training_ratio, max_training_images, max_testing_images, selected_genera, source_root, testing_destination_root,
-training_destination_root, existing_training_root, existing_testing_root, append)
-
-# Export metadata for existing training and testing data
-process_existing_files(training_destination_root, csv_path, export_csv=True)
-process_existing_files(testing_destination_root, csv_path, export_csv=True)
-
-# Print information for the training directory
-print("Training Directory Information:")
-print_directory_info(training_destination_root)
-
-# Print information for the testing directory
-print("/nTesting Directory Information:")
-print_directory_info(testing_destination_root)
-
 """
 
 # Imports
