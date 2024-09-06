@@ -107,7 +107,7 @@ def main():
         v2.RandomHorizontalFlip(p=0.5),
         v2.ColorJitter(brightness = (0.1), contrast = (0.1), saturation = (0.1), hue = (0.01)),
         v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=(0.5046, 0.5396, 0.4885), std=(0.2176, 0.2147, 0.2471)),
+        v2.Normalize(mean=(0.5712, 0.6121, 0.5827), std=(0.2224, 0.2136, 0.2586)),
         v2.RandomAffine(degrees=(-5,5), shear = (0, 0, -5, 5), 
                         interpolation = v2.InterpolationMode.BILINEAR, fill=0),
     ])
