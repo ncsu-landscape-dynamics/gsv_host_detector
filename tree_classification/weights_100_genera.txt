@@ -1,0 +1,51 @@
+# Select 100 genera
+selected_genera = ["acer", "fraxinus", "quercus", "ulmus", "prunus", "tilia", "pyrus", "gleditsia", "malus", "platanus", "liquidambar", 
+                   "pinus", "magnolia", "picea", "ginkgo", "zelkova", "celtis", "crataegus", "populus", "carpinus", "syringa", "lagerstroemia", 
+                   "betula", "amelanchier", "cornus", "cercis", "gymnocladus", "washingtonia", "aesculus", "ficus", "eucalyptus", "pistacia", 
+                   "cinnamomum", "koelreuteria", "syagrus", "juniperus", "robinia", "cupressus", "callistemon", "liriodendron", "catalpa", "ligustrum", 
+                   "thuja", "jacaranda", "cercidiphyllum", "ceratonia", "fagus", "morus", "schinus", "phoenix", "pittosporum", "parrotia", "sorbus", "olea", 
+                   "tristaniopsis", "cupaniopsis", "melaleuca", "juglans", "arbutus", "nyssa", "acacia", "cedrus", "podocarpus", "styrax", "metrosideros", 
+                   "lophostemon", "eriobotrya", "ailanthus", "metasequoia", "cladrastis", "styphnolobium", "casuarina", "maytenus", "sequoia", "pseudotsuga", 
+                   "taxodium", "citrus", "nerium", "alnus", "ostrya", "chamaecyparis", "triadica", "rhamnus", "salix", "corylus", "myoporum", "albizia", 
+                   "phellodendron", "ilex", "rhus", "elaeagnus", "persea", "larix", "abies", "carya", "hibiscus", "chionanthus", "tsuga", "taxus", "castanea"]
+
+
+
+
+# Weights inverse proportion to frequency
+
+tensor([  16.3308,   19.5188,   21.4612,   22.6739,   24.8179,   24.4910,
+          35.0551,   37.3372,   33.2994,   39.6037,   43.3180,   51.9065,
+          48.3771,   50.1605,   52.3941,   67.4315,   60.1786,   57.4440,
+          73.4803,   58.2222,   64.7716,   83.9775,   66.5532,   73.7845,
+          74.5828,   81.2869,   90.6673,  105.0896,   90.5999,  114.4741,
+         144.0915,  135.4631,  139.3379,  119.6280,  166.3679,  153.0237,
+         112.6041,  156.9347,  217.6610,  115.1778,  138.6768,  123.6777,
+         134.1697,  186.0677,  141.5513,  214.4038,  129.2567,  121.2358,
+         157.8842,  202.1826,  203.8181,  176.3669,  149.6698,  197.5366,
+         279.1016,  269.9254,  255.3068,  144.1483,  214.9715,  192.7937,
+         198.5026,  200.6833,  310.7988,  208.7084,  387.4274,  366.0761,
+         271.8333,  164.0889,  280.9258,  336.7226,  372.9903,  315.3595,
+         377.8118,  238.8650,  263.0266,  244.7046,  327.9569,  353.6728,
+         286.2076,  289.4960,  496.7288,  393.9019,  430.5763,  481.3492,
+         330.1798,  598.4341,  334.2580,  521.5475,  363.5264,  431.8487,
+         471.1077,  583.1508, 1043.8400,  495.0461,  458.1116,  928.4473,
+         688.0302,  477.5739,  900.9716,  578.9921])
+
+# Weights inverse proportion to square root of frequency
+
+tensor([ 4.0411,  4.4180,  4.6326,  4.7617,  4.9818,  4.9488,  5.9207,  6.1104,
+         5.7706,  6.2931,  6.5816,  7.2046,  6.9554,  7.0824,  7.2384,  8.2117,
+         7.7575,  7.5792,  8.5721,  7.6303,  8.0481,  9.1639,  8.1580,  8.5898,
+         8.6361,  9.0159,  9.5219, 10.2513,  9.5184, 10.6993, 12.0038, 11.6389,
+        11.8041, 10.9375, 12.8984, 12.3703, 10.6115, 12.5274, 14.7533, 10.7321,
+        11.7761, 11.1210, 11.5832, 13.6407, 11.8975, 14.6425, 11.3691, 11.0107,
+        12.5652, 14.2191, 14.2765, 13.2803, 12.2340, 14.0548, 16.7063, 16.4294,
+        15.9783, 12.0062, 14.6619, 13.8850, 14.0891, 14.1663, 17.6295, 14.4467,
+        19.6832, 19.1331, 16.4874, 12.8097, 16.7608, 18.3500, 19.3130, 17.7584,
+        19.4374, 15.4553, 16.2181, 15.6430, 18.1096, 18.8062, 16.9177, 17.0146,
+        22.2874, 19.8470, 20.7503, 21.9397, 18.1709, 24.4629, 18.2827, 22.8374,
+        19.0664, 20.7810, 21.7050, 24.1485, 32.3085, 22.2496, 21.4035, 30.4704,
+        26.2303, 21.8535, 30.0162, 24.0623])
+
+
