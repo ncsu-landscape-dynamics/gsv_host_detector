@@ -134,7 +134,6 @@ def main():
     # How many classes are in the training and testing datasets?
     logging.info(f"Classes in the Training Dataset: {len(train_dataset.classes)}")
     logging.info(f"Classes in the Testing Dataset: {len(test_dataset.classes)}")
-    logging.info(f"Classes in the Testing Dataset (Autoarborist Only): {len(test_dataset_aa.classes)}")
     logging.info(f"Training Genera: {selected_genera}")
     num_classes = len(train_dataset.classes)
 
