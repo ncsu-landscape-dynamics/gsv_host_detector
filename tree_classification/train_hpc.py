@@ -170,8 +170,6 @@ def main():
     print(f"Starting Model Training: Experiment '{experiment}'")
     print(f"Train Data Directory: {train_data_dir}")
     print(f"Test Data Directory: {test_data_dir}")
-    print(f"Test Data Directory for AA: {test_data_dir_aa}")
-    print(f"Test Data Directory for iNaturalist: {test_data_dir_inat}")
     print(f"Batch Size: {bs}")
     print(f"Number of Epochs: {epochs}")
     print(f"Learning Rate: {lr}")
