@@ -85,8 +85,6 @@ def main():
     experiment = config['experiment']
     train_data_dir = config['train_data_dir']
     test_data_dir = config['test_data_dir']
-    test_data_dir_aa = config['test_data_dir_aa']
-    test_data_dir_inat = config['test_data_dir_inat']
     output_path = config['output_path']
     model_checkpoint = config['checkpoint']
 
@@ -106,24 +104,18 @@ def main():
         v2.CenterCrop(size=(768, 768)),
         v2.Resize(size=(512, 512), antialias=True),
         v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=(0.5046, 0.5396, 0.4885), std=(0.2176, 0.2147, 0.2471))
+        v2.Normalize(mean=(0.5708, 0.6118, 0.5824), std=(0.2223, 0.2135, 0.2583))
     ])
     
     # Load Testing Datasets
     test_dataset = ImageFolder(test_data_dir, transform = test_transforms)
-    test_dataset_aa = ImageFolder(test_data_dir_aa, transform = test_transforms)
-    test_dataset_inat = ImageFolder(test_data_dir_inat, transform = test_transforms)
     
     # Create DataLoaders
     test_dl = DataLoader(dataset = test_dataset, batch_size = 1, num_workers = 4, pin_memory = True)
-    test_dl_aa = DataLoader(dataset = test_dataset_aa, batch_size = 1, num_workers = 4, pin_memory = True)
-    test_dl_inat = DataLoader(dataset = test_dataset_inat, batch_size = 1, num_workers = 4, pin_memory = True)
     
      # Evaluate model on each test dataset
     print("Evaluating Models")
     evaluate_model(model, test_dl, selected_genera, output_path, 'aa_inat_test')
-    evaluate_model(model, test_dl_aa, selected_genera, output_path, 'aa_test')
-    evaluate_model(model, test_dl_inat, selected_genera, output_path, 'inat_test')
 
 
 if __name__ == '__main__':
