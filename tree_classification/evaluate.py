@@ -51,7 +51,7 @@ def evaluate_model(model, data_loader, selected_genera, output_dir, dataset_name
 
     # Plot Confusion Matrix
     disp = ConfusionMatrixDisplay(cf_matrix, display_labels=selected_genera)
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(20, 20))
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=ax)
     plt.savefig(os.path.join(output_dir, f'{dataset_name}_confusion_matrix.png'), dpi=300)
     plt.close()
