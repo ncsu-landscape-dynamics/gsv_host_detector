@@ -71,6 +71,7 @@ def main():
     train_data_dir = config['train_data_dir']
     test_data_dir = config['test_data_dir']
     output_path = config['output_path']
+    model_path = config['model_path']
 
     # Model Parameters
     bs = config['batch_size']
@@ -107,7 +108,7 @@ def main():
         v2.RandomHorizontalFlip(p=0.5),
         v2.ColorJitter(brightness = (0.1), contrast = (0.1), saturation = (0.1), hue = (0.01)),
         v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=(0.5708, 0.6118, 0.5824), std=(0.2223, 0.2135, 0.2583)),
+        v2.Normalize(mean=(0.5712, 0.6121, 0.5827), std=(0.2224, 0.2136, 0.2586)),
         v2.RandomAffine(degrees=(-5,5), shear = (0, 0, -5, 5), 
                         interpolation = v2.InterpolationMode.BILINEAR, fill=0),
     ])
@@ -122,7 +123,7 @@ def main():
         v2.CenterCrop(size=(768, 768)),
         v2.Resize(size=(512, 512), antialias=True),
         v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=(0.5708, 0.6118, 0.5824), std=(0.2223, 0.2135, 0.2583))
+        v2.Normalize(mean=(0.5712, 0.6121, 0.5827), std=(0.2224, 0.2136, 0.2586))
     ])
 
     # Create Image Folder Datasets
@@ -134,6 +135,7 @@ def main():
     # How many classes are in the training and testing datasets?
     logging.info(f"Classes in the Training Dataset: {len(train_dataset.classes)}")
     logging.info(f"Classes in the Testing Dataset: {len(test_dataset.classes)}")
+    logging.info(f"Classes in the Testing Dataset (Autoarborist Only): {len(test_dataset_aa.classes)}")
     logging.info(f"Training Genera: {selected_genera}")
     num_classes = len(train_dataset.classes)
 
@@ -161,7 +163,12 @@ def main():
     val_dl = DeviceDataLoader(val_dl, device)
 
     # Load the model to the GPU
-    model = to_device(EfficientNetImageClassification(num_classes), device)
+    # Check if model_path is empty and either create a new model or load from the path
+    if not model_path:
+        model = to_device(EfficientNetImageClassification(num_classes), device)
+    else:
+        model = load_classifier_model(model_path, selected_genera)
+    
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f'Number of Model Parameters: ', params)
@@ -170,6 +177,8 @@ def main():
     print(f"Starting Model Training: Experiment '{experiment}'")
     print(f"Train Data Directory: {train_data_dir}")
     print(f"Test Data Directory: {test_data_dir}")
+    print(f"Test Data Directory for AA: {test_data_dir_aa}")
+    print(f"Test Data Directory for iNaturalist: {test_data_dir_inat}")
     print(f"Batch Size: {bs}")
     print(f"Number of Epochs: {epochs}")
     print(f"Learning Rate: {lr}")
