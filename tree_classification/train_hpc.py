@@ -224,7 +224,7 @@ def main():
 
     # Plot Confusion Matrix
     disp = ConfusionMatrixDisplay(cf_matrix, display_labels=selected_genera)
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(20, 20))
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=ax)
     plt.savefig(confusion_matrix_path, dpi=300)
     plt.close()
