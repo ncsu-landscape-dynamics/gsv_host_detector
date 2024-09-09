@@ -1,10 +1,8 @@
 {
-    "experiment": "exp8_updated_base_aa_inat_curated_50epochs_june1324",
-    "train_data_dir": "D:\\blaginh\\tree_classification\\aa_inat_combined\\training_data_top1000_may724_curated",
-    "test_data_dir": "D:\\blaginh\\tree_classification\\aa_inat_combined\\testing_data_top1000_may724_curated",
-    "test_data_dir_aa": "D:\\blaginh\\tree_classification\\autoarborist\\testing_dataset_small_march624",
-    "test_data_dir_inat": "D:\\blaginh\\tree_classification\\inaturalist\\testing_data_top1000_may724_curated",
-    "output_path": "D:\\blaginh\\tree_classification\\model_outputs\\exp8_updated_base_aa_inat_curated_100epochs_june1324",
-    "checkpoint": "checkpoint_epoch_47.pth",
-    "selected_genera": ["acer", "ailanthus", "betula", "citrus", "cupaniopsis", "erythrina", "fraxinus", "gleditsia", "juglans", "juniperus", "magnolia", "phoenix", "picea", "pinus", "prunus", "pseudotsuga", "pyrus", "quercus", "rhus", "sequoia", "taxodium", "thuja", "tilia", "ulmus", "washingtonia"]
+    "experiment": "exp-11-100-genera-class-weights-inv-freq",
+    "train_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/full_100_genera_train_test_sept24/train_full",
+    "test_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/full_100_genera_train_test_sept24/test_full",
+    "output_path": "/share/rkmeente/talake2/tmp/exp-11-100-genera-class-weights-inv-freq",
+    "checkpoint": "checkpoint_epoch_19.pth",
+    "selected_genera": ["acer", "fraxinus", "quercus", "ulmus", "prunus", "tilia", "pyrus", "gleditsia", "malus", "platanus", "liquidambar", "pinus", "magnolia", "picea", "ginkgo", "zelkova", "celtis", "crataegus", "populus", "carpinus", "syringa", "lagerstroemia", "betula", "amelanchier", "cornus", "cercis", "gymnocladus", "washingtonia", "aesculus", "ficus", "eucalyptus", "pistacia", "cinnamomum", "koelreuteria", "syagrus", "juniperus", "robinia", "cupressus", "callistemon", "liriodendron", "catalpa", "ligustrum", "thuja", "jacaranda", "cercidiphyllum", "ceratonia", "fagus", "morus", "schinus", "phoenix", "pittosporum", "parrotia", "sorbus", "olea", "tristaniopsis", "cupaniopsis", "melaleuca", "juglans", "arbutus", "nyssa", "acacia", "cedrus", "podocarpus", "styrax", "metrosideros", "lophostemon", "eriobotrya", "ailanthus", "metasequoia", "cladrastis", "styphnolobium", "casuarina", "maytenus", "sequoia", "pseudotsuga", "taxodium", "citrus", "nerium", "alnus", "ostrya", "chamaecyparis", "triadica", "rhamnus", "salix", "corylus", "myoporum", "albizia", "phellodendron", "ilex", "rhus", "elaeagnus", "persea", "larix", "abies", "carya", "hibiscus", "chionanthus", "tsuga", "taxus", "castanea"]
 }
