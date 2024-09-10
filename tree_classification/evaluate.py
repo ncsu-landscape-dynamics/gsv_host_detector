@@ -24,7 +24,6 @@ import time
 from imageio import imread
 from sklearn.metrics import classification_report
 
-
 # Imports for Host Tree Classification
 from tree_classification import models, preprocess, utilities
 from tree_classification.models import *
@@ -48,16 +47,17 @@ def evaluate_model(model, data_loader, selected_genera, output_dir, dataset_name
     cf_matrix = confusion_matrix(y_true, y_pred)
     print(f"Confusion matrix for {dataset_name}:")
     print(cf_matrix)
+    np.savetxt(os.path.join(output_dir, f'{dataset_name}_confusion_matrix.csv'), cf_matrix, delimiter=',')
 
     # Plot Confusion Matrix
-    disp = ConfusionMatrixDisplay(cf_matrix, display_labels=selected_genera)
+    disp = ConfusionMatrixDisplay(cf_matrix, display_labels=sorted(selected_genera))
     fig, ax = plt.subplots(figsize=(20, 20))
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=ax)
     plt.savefig(os.path.join(output_dir, f'{dataset_name}_confusion_matrix.png'), dpi=300)
     plt.close()
 
     # Export classification report to CSV
-    report_data = classification_report(y_true, y_pred, target_names=selected_genera, output_dict=True)
+    report_data = classification_report(y_true, y_pred, target_names=sorted(selected_genera), output_dict=True)
     report_df = pd.DataFrame(report_data).transpose()
     print(f"Classification report for {dataset_name}:")
     print(report_df)
@@ -115,7 +115,7 @@ def main():
     
      # Evaluate model on each test dataset
     print("Evaluating Models")
-    evaluate_model(model, test_dl, selected_genera, output_path, 'aa_inat_test')
+    evaluate_model(model, test_dl, selected_genera, output_path, 'exp-11-100-genera-class-weights-inv-freq-sqrt-checkpoint-19')
 
 
 if __name__ == '__main__':
