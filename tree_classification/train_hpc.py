@@ -220,17 +220,17 @@ def main():
     # Confusion Matrix
     cf_matrix = confusion_matrix(y_true, y_pred)
     logging.info(cf_matrix)
-    print(cf_matrix)
+    np.savetxt(os.path.join(output_path, f'{experiment}_confusion_matrix.csv'), cf_matrix, delimiter=',')
 
     # Plot Confusion Matrix
-    disp = ConfusionMatrixDisplay(cf_matrix, display_labels=selected_genera)
+    disp = ConfusionMatrixDisplay(cf_matrix, display_labels=sorted(selected_genera))
     fig, ax = plt.subplots(figsize=(20, 20))
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=ax)
     plt.savefig(confusion_matrix_path, dpi=300)
     plt.close()
 
     # Export classification report to csv
-    report_data = classification_report(y_true, y_pred, target_names = selected_genera, output_dict=True)
+    report_data = classification_report(y_true, y_pred, target_names = sorted(selected_genera), output_dict=True)
     report_df = pd.DataFrame(report_data).transpose()
     logging.info(report_df)
     print(report_df)
