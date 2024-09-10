@@ -218,7 +218,7 @@ def main():
             y_true.extend(labels)
 
     # Confusion Matrix
-    cf_matrix = confusion_matrix(y_true, y_pred)
+    cf_matrix = confusion_matrix(y_true, y_pred, normalize='pred')
     logging.info(cf_matrix)
     np.savetxt(os.path.join(output_path, f'{experiment}_confusion_matrix.csv'), cf_matrix, delimiter=',')
 
