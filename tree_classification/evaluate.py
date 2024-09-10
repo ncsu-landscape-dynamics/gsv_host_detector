@@ -44,7 +44,7 @@ def evaluate_model(model, data_loader, selected_genera, output_dir, dataset_name
             y_true.extend(labels)
 
     # Confusion Matrix
-    cf_matrix = confusion_matrix(y_true, y_pred)
+    cf_matrix = confusion_matrix(y_true, y_pred, normalize='pred')
     print(f"Confusion matrix for {dataset_name}:")
     print(cf_matrix)
     np.savetxt(os.path.join(output_dir, f'{dataset_name}_confusion_matrix.csv'), cf_matrix, delimiter=',')
