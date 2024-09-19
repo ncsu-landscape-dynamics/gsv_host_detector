@@ -196,5 +196,5 @@ cleaned_df = cleaned_df[~((cleaned_df['unique_sciname'] == 'NA') & cleaned_df['u
 
 cleaned_df = cleaned_df[~((cleaned_df['unique_common_name'] == 'NA') & cleaned_df['unique_sciname'].duplicated(keep=False))]
 
-cleaned_df.to_excel('cleaned_cityDF.xlsx', index=False)
+cleaned_df.to_csv('cleaned_cityDF.csv', index=False)
 
