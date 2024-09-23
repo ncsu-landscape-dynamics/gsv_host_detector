@@ -161,12 +161,10 @@ def evaluate(model, val_loader):
     return model.validation_epoch_end(outputs)
 
 # Fit model with FP16 mixed precision
-def fit(epochs, lr, model, train_loader, val_loader, optimizer=None, 
+def fit(epochs, lr, model, train_loader, val_loader, optimizer, 
         outpath="model_checkpoint", lr_patience=5, es_patience=10):
 
     history = []
-    if optimizer is None:
-        optimizer = torch.optim.Adam(model.parameters(), lr)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=lr_patience, verbose=True)
     scaler = amp.GradScaler()
 
