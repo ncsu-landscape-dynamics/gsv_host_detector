@@ -189,7 +189,7 @@ def main():
     start_time = time.time()
     
     # Fit model and record result after epoch
-    history = fit(epochs, lr, model, train_dl, val_dl, optimizer=lambda: optimizer, outpath = output_path, lr_patience = lr_patience, es_patience = es_patience)
+    history = fit(epochs, lr, model, train_dl, val_dl, optimizer, outpath = output_path, lr_patience = lr_patience, es_patience = es_patience)
     
     elapsed_time = time.time() - start_time
     
