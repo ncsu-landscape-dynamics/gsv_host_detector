@@ -49,7 +49,7 @@ class ImageClassificationBase(nn.Module): # https://pytorch.org/docs/stable/gene
         198.5026, 200.6833, 310.7988, 208.7084, 387.4274, 366.0761, 271.8333, 164.0889, 280.9258, 336.7226, 372.9903, 315.3595,
         377.8118, 238.8650, 263.0266, 244.7046, 327.9569, 353.6728, 286.2076, 289.4960, 496.7288, 393.9019, 430.5763, 481.3492,
         330.1798, 598.4341, 334.2580, 521.5475, 363.5264, 431.8487, 471.1077, 583.1508, 1043.8400, 495.0461, 458.1116, 928.4473,
-        688.0302, 477.5739, 900.9716, 578.9921], device = device)
+        688.0302, 477.5739, 900.9716, 578.9921], device=device)
         # Weights inversely proportion to square root of class frequency
         class_weights_sqrt_inv_freq = torch.tensor([4.0411, 4.4180, 4.6326, 4.7617, 4.9818, 4.9488, 5.9207, 6.1104,
         5.7706, 6.2931, 6.5816, 7.2046, 6.9554, 7.0824, 7.2384, 8.2117, 7.7575, 7.5792, 8.5721, 7.6303, 8.0481, 9.1639, 8.1580, 8.5898,
@@ -57,8 +57,8 @@ class ImageClassificationBase(nn.Module): # https://pytorch.org/docs/stable/gene
         11.7761, 11.1210, 11.5832, 13.6407, 11.8975, 14.6425, 11.3691, 11.0107, 12.5652, 14.2191, 14.2765, 13.2803, 12.2340, 14.0548, 16.7063, 16.4294,
         15.9783, 12.0062, 14.6619, 13.8850, 14.0891, 14.1663, 17.6295, 14.4467, 19.6832, 19.1331, 16.4874, 12.8097, 16.7608, 18.3500, 19.3130, 17.7584,
         19.4374, 15.4553, 16.2181, 15.6430, 18.1096, 18.8062, 16.9177, 17.0146, 22.2874, 19.8470, 20.7503, 21.9397, 18.1709, 24.4629, 18.2827, 22.8374,
-        19.0664, 20.7810, 21.7050, 24.1485, 32.3085, 22.2496, 21.4035, 30.4704, 26.2303, 21.8535, 30.0162, 24.0623], device = device)
-        loss = F.cross_entropy(out, labels, label_smoothing = 0.05, weight = class_weights_sqrt_inv_freq) # Calculate loss
+        19.0664, 20.7810, 21.7050, 24.1485, 32.3085, 22.2496, 21.4035, 30.4704, 26.2303, 21.8535, 30.0162, 24.0623], device=device)
+        loss = F.cross_entropy(out, labels, label_smoothing = 0.05, weight=class_weights_sqrt_inv_freq) # Calculate loss
         return loss
   
     def validation_step(self, batch):
@@ -141,12 +141,16 @@ class DeviceDataLoader():
         """ Number of batches """
         return len(self.dl)
 
-def save_checkpoint(model, epoch, path="model_checkpoints"):
+def save_checkpoint(model, epoch, optimizer, path="model_checkpoints"):
     if not os.path.exists(path):
         os.makedirs(path)
-    filename = f"checkpoint_epoch_{epoch+1}.pth"
+    filename = f"checkpoint_epoch_{epoch+1}.tar"
     filepath = os.path.join(path, filename)
-    torch.save(model.state_dict(), filepath)
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict()
+        }, filepath)
     print(f"Checkpoint saved: {filepath}")
 
 # Do not compute new gradients when evaluating a model
@@ -157,11 +161,12 @@ def evaluate(model, val_loader):
     return model.validation_epoch_end(outputs)
 
 # Fit model with FP16 mixed precision
-def fit(epochs, lr, model, train_loader, val_loader, opt_func=torch.optim.Adam, 
+def fit(epochs, lr, model, train_loader, val_loader, optimizer=None, 
         outpath="model_checkpoint", lr_patience=5, es_patience=10):
 
     history = []
-    optimizer = opt_func(model.parameters(), lr)
+    if optimizer is None:
+        optimizer = torch.optim.Adam(model.parameters(), lr)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=lr_patience, verbose=True)
     scaler = amp.GradScaler()
 
@@ -199,7 +204,7 @@ def fit(epochs, lr, model, train_loader, val_loader, opt_func=torch.optim.Adam,
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             early_stopping_counter = 0
-            save_checkpoint(model, epoch, outpath)
+            save_checkpoint(model, epoch, optimizer, outpath)
         else:
             early_stopping_counter += 1
             if early_stopping_counter >= es_patience:
@@ -215,9 +220,12 @@ def load_classifier_model(classifier_path: str, selected_genera: list) -> torch.
     device = get_default_device()
     num_classes = len(selected_genera)
     model = to_device(EfficientNetImageClassification(num_classes), device)
-    model.load_state_dict(torch.load(classifier_path))
+    optimizer = torch.optim.Adam(model.parameters())
+    checkpoint = torch.load(classifier_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     model.eval()
-    return model
+    return model, optimizer
 
 
 # Functions to visualize the results
