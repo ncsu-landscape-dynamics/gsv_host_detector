@@ -165,8 +165,9 @@ def main():
     # Check if model_path is empty and either create a new model or load from the path
     if not model_path:
         model = to_device(EfficientNetImageClassification(num_classes), device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     else:
-        model = load_classifier_model(model_path, selected_genera)
+        model, optimizer = load_classifier_model(model_path, selected_genera)
     
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
@@ -188,7 +189,7 @@ def main():
     start_time = time.time()
     
     # Fit model and record result after epoch
-    history = fit(epochs, lr, model, train_dl, val_dl, opt_func = torch.optim.Adam, outpath = output_path, lr_patience = lr_patience, es_patience = es_patience)
+    history = fit(epochs, lr, model, train_dl, val_dl, optimizer=lambda: optimizer, outpath = output_path, lr_patience = lr_patience, es_patience = es_patience)
     
     elapsed_time = time.time() - start_time
     
@@ -224,7 +225,7 @@ def main():
 
     # Plot Confusion Matrix
     disp = ConfusionMatrixDisplay(cf_matrix, display_labels=sorted(selected_genera))
-    fig, ax = plt.subplots(figsize=(20, 20))
+    fig, ax = plt.subplots(figsize=(50, 50))
     disp.plot(cmap=plt.cm.Blues, xticks_rotation='vertical', ax=ax)
     plt.savefig(confusion_matrix_path, dpi=300)
     plt.close()
