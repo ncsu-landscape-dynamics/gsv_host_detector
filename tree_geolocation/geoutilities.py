@@ -62,9 +62,12 @@ def load_classifier_model(classifier_path: str, selected_genera: list) -> torch.
     device = get_default_device()
     num_classes = len(selected_genera)
     model = to_device(EfficientNetImageClassification(num_classes), device)
-    model.load_state_dict(torch.load(classifier_path))
+    optimizer = torch.optim.Adam(model.parameters())
+    checkpoint = torch.load(classifier_path)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     model.eval()
-    return model
+    return model, optimizer
 
 
 def calculate_distance(p1, p2):
