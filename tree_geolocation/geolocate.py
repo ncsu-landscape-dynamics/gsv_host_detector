@@ -73,7 +73,7 @@ def main():
     # Load Detection, Depth Estimation, and Classification Models
     tree_model = load_yolo_model(yolo_model_path)
     zoe = load_zoedepth_model()
-    classifier = load_classifier_model(classifier_path, selected_genera)
+    classifier, _ = load_classifier_model(classifier_path, selected_genera)
 
     # Run Initial Tree Geolocation
     all_tree_geolocation_results_df = pd.DataFrame()
