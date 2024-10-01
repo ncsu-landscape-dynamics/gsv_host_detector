@@ -1,7 +1,0 @@
-{
-    "api_key_path": "Z:\\auto_arborist_cvpr2022_v0.15\\api_keys\\Google_Street_View_Static_API_Key_Private_LakeT.txt",
-	"latitude": "38.50500615673824",
-	"longitude": "-122.46982548134353",
-	"distance": "150",
-	"output_path": "C:\\users\\talake2\\desktop\\image_downloaders\\gsv_images"
-}
