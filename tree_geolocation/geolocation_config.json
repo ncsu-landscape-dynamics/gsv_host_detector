@@ -1,0 +1,8 @@
+{
+    "experiment": "exp-geolocation-test",
+	"gsv_img_folder": "C:\\Users\\talake2\\Desktop\\pano_download_testing",
+	"output_path": "C:\\Users\\talake2\\Desktop\\pano_download_testing",
+	"yolo_model_path": "C:\\Users\\talake2\\Desktop\\auto_arborist_cvpr2022_v015\\yolov5\\runs\\train\\tree-detector-yolov5x-oct2323-autoarborist-25epochs\\weights\\last.pt",
+	"classifier_path": "D:\\blaginh\\tree_classification\\model_outputs\\exp12_hpc_tests\\exp-12-100-genera-no-class-weights-run-20-40\\checkpoint_epoch_8.tar",
+    "selected_genera": ["acer", "fraxinus", "quercus", "ulmus", "prunus", "tilia", "pyrus", "gleditsia", "malus", "platanus", "liquidambar", "pinus", "magnolia", "picea", "ginkgo", "zelkova", "celtis", "crataegus", "populus", "carpinus", "syringa", "lagerstroemia", "betula", "amelanchier", "cornus", "cercis", "gymnocladus", "washingtonia", "aesculus", "ficus", "eucalyptus", "pistacia", "cinnamomum", "koelreuteria", "syagrus", "juniperus", "robinia", "cupressus", "callistemon", "liriodendron", "catalpa", "ligustrum", "thuja", "jacaranda", "cercidiphyllum", "ceratonia", "fagus", "morus", "schinus", "phoenix", "pittosporum", "parrotia", "sorbus", "olea", "tristaniopsis", "cupaniopsis", "melaleuca", "juglans", "arbutus", "nyssa", "acacia", "cedrus", "podocarpus", "styrax", "metrosideros", "lophostemon", "eriobotrya", "ailanthus", "metasequoia", "cladrastis", "styphnolobium", "casuarina", "maytenus", "sequoia", "pseudotsuga", "taxodium", "citrus", "nerium", "alnus", "ostrya", "chamaecyparis", "triadica", "rhamnus", "salix", "corylus", "myoporum", "albizia", "phellodendron", "ilex", "rhus", "elaeagnus", "persea", "larix", "abies", "carya", "hibiscus", "chionanthus", "tsuga", "taxus", "castanea"]
+}
