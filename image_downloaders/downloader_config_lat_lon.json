@@ -1,0 +1,7 @@
+{
+    "api_key_path": "Z:\\auto_arborist_cvpr2022_v0.15\\api_keys\\Google_Street_View_Static_API_Key_Private_LakeT.txt",
+	"latitude": "43.5423002",
+	"longitude": "-96.6733430",
+	"distance": "1000",
+	"output_path": "C:\\Users\\talake2\\Desktop\\tree-geolocation-exp\\geolocation-panos-testing-tiny\\sioux-falls-2"
+}

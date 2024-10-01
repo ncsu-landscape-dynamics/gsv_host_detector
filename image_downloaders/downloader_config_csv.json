@@ -1,0 +1,5 @@
+{
+    "api_key_path": "Z:\\auto_arborist_cvpr2022_v0.15\\api_keys\\Google_Street_View_Static_API_Key_Private_LakeT.txt",
+	"csv_roads_points_file": "C:\\Users\\talake2\\Desktop\\tree-geolocation-exp\\open_street_maps_city_roads_autoarborist\\road_testing_split_points_filtered_near_tree_inventories\\charlottesville_road_points_25m_near_inventories.csv",
+	"output_path": "C:\\Users\\talake2\\Desktop\\tree-geolocation-exp\\charlottesville_downloader_test"
+}
