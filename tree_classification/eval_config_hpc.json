@@ -1,0 +1,7 @@
+{
+    "experiment": "test_full",
+    "test_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/full_100_genera_train_test_sept24/test_full",
+    "output_path": "/share/rkmeente/talake2/tmp/exp-12-100-genera-no-class-weights-run-1-20",
+    "checkpoint": "checkpoint_epoch_19.tar",
+    "selected_genera": ["acer", "fraxinus", "quercus", "ulmus", "prunus", "tilia", "pyrus", "gleditsia", "malus", "platanus", "liquidambar", "pinus", "magnolia", "picea", "ginkgo", "zelkova", "celtis", "crataegus", "populus", "carpinus", "syringa", "lagerstroemia", "betula", "amelanchier", "cornus", "cercis", "gymnocladus", "washingtonia", "aesculus", "ficus", "eucalyptus", "pistacia", "cinnamomum", "koelreuteria", "syagrus", "juniperus", "robinia", "cupressus", "callistemon", "liriodendron", "catalpa", "ligustrum", "thuja", "jacaranda", "cercidiphyllum", "ceratonia", "fagus", "morus", "schinus", "phoenix", "pittosporum", "parrotia", "sorbus", "olea", "tristaniopsis", "cupaniopsis", "melaleuca", "juglans", "arbutus", "nyssa", "acacia", "cedrus", "podocarpus", "styrax", "metrosideros", "lophostemon", "eriobotrya", "ailanthus", "metasequoia", "cladrastis", "styphnolobium", "casuarina", "maytenus", "sequoia", "pseudotsuga", "taxodium", "citrus", "nerium", "alnus", "ostrya", "chamaecyparis", "triadica", "rhamnus", "salix", "corylus", "myoporum", "albizia", "phellodendron", "ilex", "rhus", "elaeagnus", "persea", "larix", "abies", "carya", "hibiscus", "chionanthus", "tsuga", "taxus", "castanea"]
+}
