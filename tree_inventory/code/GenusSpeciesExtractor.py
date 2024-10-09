@@ -3,7 +3,7 @@ from EcoNameTranslator import to_scientific, to_common, to_species
 
  
 
-cityDF = pd.read_csv("cleaned_cityDF.csv")
+cityDF = pd.read_csv("SpeciesCommon.csv")
 print(cityDF.shape[0])
 numRows = cityDF.shape[0]
 i = 0
@@ -18,6 +18,7 @@ def cleanScientific(scientificName):
         return prevFindings[scientificName]
     try:
         index = to_species([scientificName])
+        print(len(values))
         values = index[scientificName][0].split()
         if len(values) > 2:
             print(values)
@@ -28,7 +29,7 @@ def cleanScientific(scientificName):
         
 
 
-cityDF = pd.read_csv("cleaned_cityDF.csv")
+cityDF = pd.read_csv("SpeciesCommon.csv")
 cityDF[['genus_name', 'species_name']] = cityDF.apply(
     lambda row: pd.Series(cleanScientific(row['unique_sciname'])),
     axis=1,

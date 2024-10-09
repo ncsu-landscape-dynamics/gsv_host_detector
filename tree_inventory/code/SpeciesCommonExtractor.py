@@ -1,6 +1,31 @@
 import pandas as pd
-from EcoNameTranslator import to_scientific, to_common
+from EcoNameTranslator import to_scientific, to_common, to_species
 import os
+import csv
+
+prevFindings = {}
+# clean up the scientific names
+def cleanScientific(scientificName):
+    global prevFindings
+    global iterations
+    if (scientificName == 'NA'):
+        iterations += 1
+        return ["NA", "NA"]
+    # if iterations % 100 == 0 or iterations == 1:
+    #     print(str(i) + "/" + str(numRows))
+    if scientificName in prevFindings:
+        return prevFindings[scientificName]
+    try:
+        index = to_species([scientificName])
+        values = index[scientificName][0].split()
+        if len(values) > 2:
+            print(values)
+        prevFindings[scientificName] = [values[-2], values[-1]]
+        return values[-2], values[-1]
+    except:
+        prevFindings[scientificName] = ["NA", "NA"]
+        return ["NA", "NA"]
+
 
 # scientific name to common name
 i = 0
@@ -79,8 +104,9 @@ def reorganizeComma(name):
     
 # Handle NA Values
 def handleNA(value):
+    value = value.replace('.', '')
     # questions --- common name as array, or string?
-    naValues = {'', 'a.', 'nan', 'other', 'n/a'}
+    naValues = {'', 'a', 'nan', 'other', 'n/a', ' '}
     containsNaValues = {'unidentified', 'unsuitable', 'vacant', '*', '_', '-', 'proposed', 'unknown', '#', 'other ', 'no ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 
     if value.strip() in naValues or any(word in value for word in containsNaValues):
@@ -105,10 +131,12 @@ def handleNA(value):
 
 # Find the folder path and create a dataframe from it
 folder_path = "../tree_inventories_original_records"
-df = pd.DataFrame(columns=['species_name', 'common_name'])
 unorganizedData = []
+
 # Iterate through the files
 for i, filename in enumerate(os.listdir(folder_path)):
+    iterations = 1
+    print(filename)
     print("FILE #", i)
     file_path = os.path.join(folder_path, filename)
     if not filename.endswith('.csv'):
@@ -122,76 +150,57 @@ for i, filename in enumerate(os.listdir(folder_path)):
     missing_columns = [col for col in required_columns if col not in cityDF.columns]
     if missing_columns:
         unorganizedData.append(filename)
+        print(unorganizedData)
+
         continue
     
-    # select only the columns we need while also handling possible comma interruptions
     cityDF = cityDF.map(reorganizeComma)
-    cityDF = cityDF[['species_name', 'common_name']]
 
-
-    # Adding in common names using EcoNameTranslator
-    # print("NA Values in common name before: ", cityDF['common_name'].isna().sum())
-    # na_indices = cityDF[cityDF['common_name'].isna()].index
-    # print(cityDF.iloc[na_indices])
-
-    # cityDF['common_name'] = cityDF.apply(
-    #     lambda row: getCommonNames(row['species_name']) if pd.isna(row['common_name']) else row['common_name'],
-    #     axis=1
-    # )
-
-    # print("NA Values in common name after: ", cityDF['common_name'].isna().sum())
-    # print(cityDF.iloc[na_indices])
-
-
-
-    # Adding in scientific names using EcoNameTranslator
-    # print("NA Values in species name before: ", cityDF['species_name'].isna().sum())
-    # na_indices = cityDF[cityDF['species_name'].isna()].index
-    # print(cityDF.iloc[na_indices])
-
-    # cityDF['species_name'] = cityDF.apply(
-    #     lambda row: getScientificNames(row['common_name']) if pd.isna(row['species_name']) else row['species_name'],
-    #     axis=1
-    # )
-
-    # print("NA Values in species name after: ", cityDF['species_name'].isna().sum())
-    # print(cityDF.iloc[na_indices])
 
     # Drop all na values and format the table to a string
-    cityDF.dropna(how='all')
-    cityDF = cityDF[['species_name', 'common_name']]
-    cityDF['species_name'] = cityDF['species_name'].astype(str)
-    cityDF['common_name'] = cityDF['common_name'].astype(str)
+    # cityDF.dropna(how='all')
+    cityDF['unique_sciname'] = cityDF['species_name'].astype(str)
+    cityDF['unique_common_name'] = cityDF['common_name'].astype(str)
 
     # handle space removal and lowercase conversion
-    cityDF['species_name'] = cityDF['species_name'].str.strip() 
-    cityDF['species_name'] = cityDF['species_name'].str.lower()
+    cityDF['unique_sciname'] = cityDF['unique_sciname'].str.strip() 
+    cityDF['unique_sciname'] = cityDF['unique_sciname'].str.lower()
 
-    cityDF['common_name'] = cityDF['common_name'].str.strip()
-    cityDF['common_name'] = cityDF['common_name'].str.lower()
+    cityDF['unique_common_name'] = cityDF['unique_common_name'].str.strip()
+    cityDF['unique_common_name'] = cityDF['unique_common_name'].str.lower()
 
-    cityDF = cityDF.map(handleNA)
+    cityDF['unique_sciname'] = cityDF['unique_sciname'].map(handleNA)
+    cityDF['unique_common_name'] = cityDF['unique_common_name'].map(handleNA)
+    
+    
+    cityDF[['genus_name', 'species_name']] = cityDF.apply(
+        lambda row: pd.Series(cleanScientific(row['unique_sciname'])),
+        axis=1,
+        result_type='expand'
+    )
+    cols = [col for col in cityDF.columns if col not in ['unique_common_name', 'unique_sciname', 'genus_name', 'species_name']]
+    # Append the new columns at the end
+    cols += ['unique_common_name', 'unique_sciname', 'genus_name', 'species_name']
+
+    # Reorder the DataFrame
+    cityDF = cityDF[cols]
 
 
 
-    # add this files dataframe to a new dataframe
-    df = pd.concat([df, cityDF])
-    df.drop_duplicates( inplace=True)
-    duplicated_column2 = df['common_name'].duplicated(keep=False)
 
 
-# Reformat the dataframe to be put into the excel spreadsheet
-df.rename(columns={'species_name': 'unique_sciname', 'common_name': 'unique_common_name'}, inplace=True)
-df = df.map(handleNA)
+    # no longer need to handle duplicates
+    # Ensure all spaces are the same
+    # cityDF = cityDF.apply(lambda x: x.str.replace('\xa0', ' ', regex=True) if x.dtype == "object" else x)
 
-# Ensure all spaces are the same
-df = df.apply(lambda x: x.str.replace('\xa0', ' ', regex=True) if x.dtype == "object" else x)
+    # handle duplicates, including NA duplicates = longer need to drop dupliacates
+    # cleaned_df = cityDF.drop_duplicates()
+    # cleaned_df = cleaned_df[~((cleaned_df['unique_sciname'] == 'NA') & cleaned_df['unique_common_name'].duplicated(keep=False))]
 
-# handle duplicates, including NA duplicates
-cleaned_df = df.drop_duplicates()
-cleaned_df = cleaned_df[~((cleaned_df['unique_sciname'] == 'NA') & cleaned_df['unique_common_name'].duplicated(keep=False))]
+    # cleaned_df = cleaned_df[~((cleaned_df['unique_common_name'] == 'NA') & cleaned_df['unique_sciname'].duplicated(keep=False))]
 
-cleaned_df = cleaned_df[~((cleaned_df['unique_common_name'] == 'NA') & cleaned_df['unique_sciname'].duplicated(keep=False))]
+    cityDF.to_csv('inventory_copy/' + filename, index=False)
 
-cleaned_df.to_csv('cleaned_cityDF.csv', index=False)
-
+with open('inventory_copy/unorganizedData.csv', mode='w', newline='') as file:
+    writer = csv.writer(file)
+    writer.writerows(unorganizedData)
