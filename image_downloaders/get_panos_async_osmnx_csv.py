@@ -10,6 +10,7 @@ import argparse
 import logging
 from tqdm import tqdm
 from datetime import datetime
+import asyncio
 import requests
 import json
 import pandas as pd
@@ -46,13 +47,13 @@ def setup_logging(log_path):
     )
 
 # Download panoramic images async
-async def download_panoramic_images(pano_df_simple):
+async def download_panoramic_images(pano_df_simple, output_path):
     for i in tqdm(range(len(pano_df_simple))):
         # Get panoramic image unique ID
         panoID = pano_df_simple['Panorama_ID'][i]
 
         # Define the file path for the image
-        image_path = fr'C:/Users/talake2/Desktop/pano_download_testing/{panoID}.jpg'
+        image_path = fr'{output_path}/{panoID}.jpg'
 
         # Check if image already exists. If it does, skip that image.
         if os.path.exists(image_path):
@@ -72,7 +73,7 @@ async def download_panoramic_images(pano_df_simple):
             }
 
             # Write metadata to JSON file
-            with open(fr'C:/Users/talake2/Desktop/pano_download_testing/{panoID}.metadata.json', 'w') as f:
+            with open(fr'{output_path}/{panoID}.metadata.json', 'w') as f:
                 json.dump(metadata, f)
 
             # Attempt to download single panoramic image
@@ -174,23 +175,23 @@ def main():
     # Remove duplicate images based on 'Panorama_ID'
     pano_df.drop_duplicates(subset='Panorama_ID', keep='first', inplace=True)
 
-    logging.info(f'Total Available Panoramic Images:', len(pano_df))
+    logging.info(f'Total Available Panoramic Images: {len(pano_df)}')
 
     # Remove images where 'Panorama_Date' is after 2016-01
     pano_df = pano_df[pano_df['Panorama_Date'] >= '2016-01']
     pano_df.reset_index(drop=True, inplace=True)
-    logging.info(f'Total Panoramic Images After 2016:', len(pano_df))
+    logging.info(f'Total Panoramic Images After 2016: {len(pano_df)}')
 
     # Remove any panoraamic images closer than 5 meters
     pano_df_simple = remove_adjacent_panoramics(pano_df, 5)
     pano_df_simple.reset_index(drop=True, inplace=True)
 
-    logging.info(f'Total Panoramic Images After De-Duplication:', len(pano_df_simple))
+    logging.info(f'Total Panoramic Images After De-Duplication: {len(pano_df_simple)}')
 
     logging.info('Downloading Panoramic Images')
 
     # Run the async function to download panoramic images
-    asyncio.run(download_panoramic_images(pano_df_simple))
+    asyncio.run(download_panoramic_images(pano_df_simple, output_path))
 
 
 if __name__ == '__main__':
