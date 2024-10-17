@@ -106,8 +106,8 @@ def reorganizeComma(name):
 def handleNA(value):
     value = value.replace('.', '')
     # questions --- common name as array, or string?
-    naValues = {'', 'a', 'nan', 'other', 'n/a', ' '}
-    containsNaValues = {'unidentified', 'unsuitable', 'vacant', '*', '_', '-', 'proposed', 'unknown', '#', 'other ', 'no ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+    naValues = {'', 'a', 'nan', 'other', 'n/a', ' ', 'not specified'}
+    containsNaValues = {'not specified', 'unidentified', 'unsuitable', 'vacant', '*', '_', '-', 'proposed', 'unknown', '#', 'other ', 'no ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 
     if value.strip() in naValues or any(word in value for word in containsNaValues):
         return 'NA'
@@ -131,7 +131,6 @@ def handleNA(value):
 
 # Find the folder path and create a dataframe from it
 folder_path = "../tree_inventories_original_records"
-unorganizedData = []
 
 # Iterate through the files
 for i, filename in enumerate(os.listdir(folder_path)):
@@ -147,12 +146,6 @@ for i, filename in enumerate(os.listdir(folder_path)):
 
 
     cityDF = pd.read_csv(file_path)
-    missing_columns = [col for col in required_columns if col not in cityDF.columns]
-    if missing_columns:
-        unorganizedData.append(filename)
-        print(unorganizedData)
-
-        continue
     
     cityDF = cityDF.map(reorganizeComma)
 
@@ -201,6 +194,3 @@ for i, filename in enumerate(os.listdir(folder_path)):
 
     cityDF.to_csv('inventory_copy/' + filename, index=False)
 
-with open('inventory_copy/unorganizedData.csv', mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerows(unorganizedData)
