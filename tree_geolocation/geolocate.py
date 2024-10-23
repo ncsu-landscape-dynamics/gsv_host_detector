@@ -61,6 +61,9 @@ def main():
     classifier_path = config['classifier_path']
     selected_genera = config['selected_genera']
 
+    # Sort genera alphabetically
+    selected_genera = sorted(selected_genera)
+
     # Create output directory if it does not exist
     if not os.path.exists(output_path):
         os.makedirs(output_path)
