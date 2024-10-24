@@ -67,8 +67,8 @@ def getScientificNames(common_name):
     global i
     global noneCount
     global cNaValues
-    if i % 100 == 0:
-        print(i)
+    # if i % 100 == 0:
+    #     print(i)
     i += 1
     if common_name in cNaValues:
         noneCount += 1
@@ -76,17 +76,16 @@ def getScientificNames(common_name):
     elif common_name in common_namesDict:
         return common_namesDict[common_name]
     try:
-        common_names = to_scientific([common_name])[common_name][1]
+        common_names = to_scientific([common_name])[common_name][1][0]
         if len(common_names) == 0:
             raise ValueError()
         
-        common_namesDict[common_name] = common_names
-        
+        common_namesDict[common_name] = common_names[0]
         return common_names
     except:
         noneCount += 1 
         cNaValues.add(common_name)
-        return None
+        return "NA"
 
 # reverse comma ordering
 def reorganizeComma(name):
@@ -106,7 +105,7 @@ def reorganizeComma(name):
 def handleNA(value):
     value = value.replace('.', '')
     # questions --- common name as array, or string?
-    naValues = {'', 'a', 'nan', 'other', 'n/a', ' ', 'not specified'}
+    naValues = {'', 'a', 'nan', 'other', 'n/a', ' ', 'not specified', 'na', 'none', 'p', 'f'}
     containsNaValues = {'not specified', 'unidentified', 'unsuitable', 'vacant', '*', '_', '-', 'proposed', 'unknown', '#', 'other ', 'no ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
 
     if value.strip() in naValues or any(word in value for word in containsNaValues):
@@ -131,9 +130,15 @@ def handleNA(value):
 
 # Find the folder path and create a dataframe from it
 folder_path = "../tree_inventories_original_records"
-
+currentCities = {"columbus_inventory.csv"}
+usdaDF = pd.read_csv(os.path.join(folder_path, 'usda_code.csv'), on_bad_lines='skip')
+print(usdaDF.columns.tolist())
 # Iterate through the files
 for i, filename in enumerate(os.listdir(folder_path)):
+    if filename == 'usda_code.csv':
+        continue
+    if filename not in currentCities:
+        continue
     iterations = 1
     print(filename)
     print("FILE #", i)
@@ -141,19 +146,40 @@ for i, filename in enumerate(os.listdir(folder_path)):
     if not filename.endswith('.csv'):
         continue
 
-    # The coulmns needed fom the data
-    required_columns = ['species_name', 'common_name']
-
-
     cityDF = pd.read_csv(file_path)
     
     cityDF = cityDF.map(reorganizeComma)
+    
+    
+    if filename == 'columbus_inventory.csv':
+        symbolDict = {}
+        synonymDict = {}
+        symbolDF = usdaDF.set_index('Symbol')
+        synonymDF = usdaDF.set_index('Synonym Symbol')
+
+        symbolDict = symbolDF['Common Name'].to_dict()
+        synonymDict = synonymDF['Common Name'].to_dict()
+
+        commonDict = symbolDict.copy()  
+        commonDict.update(synonymDict)
 
 
+        symbolDict = symbolDF['Scientific Name with Author'].to_dict()
+        synonymDict = synonymDF['Scientific Name with Author'].to_dict()
+
+        sciDict = symbolDict.copy()  
+        sciDict.update(synonymDict)
+
+        cityDF['common_name'] = cityDF['SP_CODE'].map(commonDict)
+        cityDF['species_name'] = cityDF['SP_CODE'].map(sciDict)
     # Drop all na values and format the table to a string
     # cityDF.dropna(how='all')
-    cityDF['unique_sciname'] = cityDF['species_name'].astype(str)
     cityDF['unique_common_name'] = cityDF['common_name'].astype(str)
+
+    # In case you need to get scientific names from ecotranslator
+    # cityDF['species_name'] = cityDF['unique_common_name'].apply(getScientificNames)
+
+    cityDF['unique_sciname'] = cityDF['species_name'].astype(str)
 
     # handle space removal and lowercase conversion
     cityDF['unique_sciname'] = cityDF['unique_sciname'].str.strip() 
