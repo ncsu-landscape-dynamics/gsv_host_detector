@@ -9,7 +9,6 @@ import os
 import argparse
 import logging
 from tqdm import tqdm
-from tqdm.asyncio import tqdm as tqdm_async
 from datetime import datetime
 import aiohttp
 import asyncio
@@ -61,46 +60,45 @@ async def get_pano_metadata_async(points_coords, api_key):
     async with aiohttp.ClientSession() as session:
         tasks = []
         
-        with tqdm_async(total=len(points_coords), desc="Fetching Metadata") as pbar:
-            for i in range(len(points_coords.geometry)):
-                lat = points_coords.geometry.y[i]
-                lon = points_coords.geometry.x[i]
-                
-                # Search for all available panoramic images closest to each point
-                panos = search_panoramas(lat=lat, lon=lon)
-                
-                # Create a task to fetch metadata for each panorama found
-                for pano in panos:
-                    task = asyncio.ensure_future(fetch_metadata(session, pano.pano_id, api_key))
-                    tasks.append((task, pano, i))
+        for i in range(len(points_coords.geometry)):
+            lat = points_coords.geometry.y[i]
+            lon = points_coords.geometry.x[i]
             
-            # Run all the tasks concurrently
-            responses = await asyncio.gather(*[task for task, _, _ in tasks])
+            # Search for all available panoramic images closest to each point
+            panos = search_panoramas(lat=lat, lon=lon)
             
-            # Process the results
-            for (response, (_, pano, i)) in zip(responses, tasks):
-                if response.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
-                    print(f"No panorama data found for pano_id: {pano.pano_id}")
-                    continue
+            # Create a task to fetch metadata for each panorama found
+            for pano in panos:
+                task = asyncio.ensure_future(fetch_metadata(session, pano.pano_id, api_key))
+                tasks.append((task, pano, i))
+        
+        # Run all the tasks concurrently
+        responses = await asyncio.gather(*[task for task, _, _ in tasks])
+        
+        # Process the results
+        for (response, (_, pano, i)) in zip(responses, tasks):
+            if response.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
+                print(f"No panorama data found for pano_id: {pano.pano_id}")
+                continue
+            
+            # Assuming `get_panorama_meta` is synchronous and not CPU-heavy, you can use it here
+            meta = get_panorama_meta(pano_id=pano.pano_id, api_key=api_key)
+            
+            if meta.date:
+                date_code = datetime.strptime(meta.date, '%Y-%m')
                 
-                # Assuming `get_panorama_meta` is synchronous and not CPU-heavy, you can use it here
-                meta = get_panorama_meta(pano_id=pano.pano_id, api_key=api_key)
-                
-                if meta.date:
-                    date_code = datetime.strptime(meta.date, '%Y-%m')
-                    
-                    # Append data on point and panoramic image location
-                    pano_data.append({
-                        'Point_Index': i,
-                        'Point_Latitude': points_coords.geometry.y[i],
-                        'Point_Longitude': points_coords.geometry.x[i],
-                        'Panorama_ID': pano.pano_id,
-                        'Panorama_Date': meta.date,
-                        'Panorama_Latitude': pano.lat,
-                        'Panorama_Longitude': pano.lon,
-                        'Panorama_Rotation': pano.heading
-                    })
-    
+                # Append data on point and panoramic image location
+                pano_data.append({
+                    'Point_Index': i,
+                    'Point_Latitude': points_coords.geometry.y[i],
+                    'Point_Longitude': points_coords.geometry.x[i],
+                    'Panorama_ID': pano.pano_id,
+                    'Panorama_Date': meta.date,
+                    'Panorama_Latitude': pano.lat,
+                    'Panorama_Longitude': pano.lon,
+                    'Panorama_Rotation': pano.heading
+                })
+
     return pd.DataFrame(pano_data)
 
 # Download panoramic images async
