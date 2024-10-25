@@ -1,4 +1,4 @@
-SHAPE_LNG,SHAPE_LAT,City,IDX,Genus
+rounded_lng,rounded_lat,City,IDX,Genus
 -121.897457403772,37.2298904808286,SanJose,1,quercus
 -123.153281,49.25813,Vancouver,2,acer
 -78.8991056882291,42.9093951067929,Buffalo,3,prunus
