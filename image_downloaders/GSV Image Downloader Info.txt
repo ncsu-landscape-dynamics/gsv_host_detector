@@ -1,7 +1,7 @@
 # To search and download GSV panoramic images, a user must first setup a Google Cloud account and obtain a 'Street View Static API' key.
 
 # Export Python Path to Parent Directory of image_downloader folder
-Ex in Bash; export PYTHONPATH=$PYTHONPATH:/c/users/talake2/desktop
+Ex in Bash; export PYTHONPATH=$PYTHONPATH:/c/users/talake2/desktop/gsv_host_detector
 
 # Load Conda Environment
 source activate ox
