@@ -299,7 +299,7 @@ def main():
     
     # Read in .csv file with points corresponding to 25- meter spacing of roads
     points_df = pd.read_csv(csv_roads_points_file)
-    points_df['geometry'] = points_df['geometry'].apply(wkt.loads)
+    points_df['geometry'] = gpd.points_from_xy(points_df['Longitude'], points_df['Latitude'])
     points_coords = gpd.GeoDataFrame(points_df, geometry='geometry', crs="EPSG:4326")  # EPSG:4326 is for WGS84 (latitude/longitude)
 
     logging.info("Finding Panoramic Images Near Road Points")
