@@ -11,6 +11,7 @@ import logging
 from tqdm import tqdm
 from datetime import datetime
 import aiohttp
+from aiohttp import ClientSession, ClientConnectorError
 import asyncio
 import requests
 import json
@@ -34,9 +35,6 @@ import osmnx as ox
 # https://github.com/robolyst/streetview/tree/master
 from streetview import search_panoramas, get_panorama_meta, get_streetview, get_panorama, get_panorama_async
 
-from image_downloaders import osmnx_functions
-from image_downloaders.osmnx_functions import *
-
 
 # Set up logging
 def setup_logging(log_path):
@@ -47,58 +45,176 @@ def setup_logging(log_path):
         datefmt='%Y-%m-%d %H:%M:%S',
     )
 
+def crop_bottom_and_right_black_border(img: Image.Image):
+    """
+    Crop the black border at the bottom and right of the panorama.
+    When you download streetviews get_panorama(), it's common to see black borders at the bottom and right of the image.
+    This is because the dimensions of the panorama are not always correct / multiple of 512, a common issue with user-contributed panoramas.
+    The implementation is not perfect, but it works for most cases.
+    """
+    (width, height) = img.size
+    bw_img = img.convert("L")
+    black_luminance = 4
+
+    # Find the bottom of the panorama
+    pixel_cursor = (0, height - 1)
+    valid_max_y = height - 1
+    while pixel_cursor[0] < width and pixel_cursor[1] >= 0:
+        pixel_color = bw_img.getpixel(pixel_cursor)
+
+        if pixel_color > black_luminance:
+            # Found a non-black pixel
+            # Double check if all the pixels below this one are black
+            all_pixels_below = list(
+                bw_img.crop((0, pixel_cursor[1] + 1, width, height)).getdata()
+            )
+            all_black = True
+            for pixel in all_pixels_below:
+                if pixel > black_luminance:
+                    all_black = False
+
+            if all_black:
+                valid_max_y = pixel_cursor[1]
+                break
+            else:
+                # A false positive, probably the actual valid bottom pixel is very close to black
+                # Reset the cursor to the next vertical line to the right
+                pixel_cursor = (pixel_cursor[0] + 1, height - 1)
+
+        else:
+            pixel_cursor = (pixel_cursor[0], pixel_cursor[1] - 1)
+
+    # Find the right of the panorama
+    pixel_cursor = (width - 1, 0)
+    valid_max_x = width - 1
+    while pixel_cursor[1] < height and pixel_cursor[0] >= 0:
+        pixel_color = bw_img.getpixel(pixel_cursor)
+
+        if pixel_color > black_luminance:
+            # Found a non-black pixel
+            # Double check if all the pixels to the right of this one are black
+            all_pixels_to_the_right = list(
+                bw_img.crop((pixel_cursor[0] + 1, 0, width, height)).getdata()
+            )
+            all_black = True
+            for pixel in all_pixels_to_the_right:
+                if pixel > black_luminance:
+                    all_black = False
+            if all_black:
+                valid_max_x = pixel_cursor[0]
+                break
+            else:
+                # A false positive, probably the actual valid right pixel is very close to black
+                # Reset the cursor to the next horizontal line below
+                pixel_cursor = (width - 1, pixel_cursor[1] + 1)
+
+        else:
+            pixel_cursor = (pixel_cursor[0] - 1, pixel_cursor[1])
+
+    valid_height = valid_max_y + 1
+    valid_width = valid_max_x + 1
+
+    if valid_height == height and valid_width == width:
+        # No black border found
+        return img
+
+    print(
+        f"Found black border. Cropping from {width}x{height} to {valid_width}x{valid_height}"
+    )
+    return img.crop((0, 0, valid_width, valid_height))
+
+# Function to remove panoramic images captured within a certain distance
+def remove_adjacent_panoramics(pano_df, distance):
+    # Convert latitude and longitude to Cartesian coordinates for distance calculation
+    coords = np.vstack([pano_df['Panorama_Longitude'], pano_df['Panorama_Latitude']]).T
+    pano_kd_tree = cKDTree(coords)
+
+    # Query the tree to find the nearest neighbor for each point
+    distances, indices = pano_kd_tree.query(coords, k=2)  # Find the nearest neighbor (k=2 because the nearest point is itself)
+    distances_meters = distances * 111139  # Convert distances to meters
+
+    # Find duplicate points within a set distance (meters)
+    duplicates = np.where((distances_meters[:, 1] <= distance))[0]
+
+    # Create a list to store indices to remove
+    indices_to_remove = []
+
+    # Iterate through the clusters and randomly keep one point while removing the rest
+    for duplicate in duplicates:
+        cluster_indices = indices[duplicate]
+        # Randomly select one index to keep
+        keep_index = np.random.choice(cluster_indices)
+        # Remove other indices
+        remove_indices = np.setdiff1d(cluster_indices, keep_index)
+        indices_to_remove.extend(remove_indices)
+
+    # Drop the indices to remove from the DataFrame
+    pano_df = pano_df.drop(index=indices_to_remove)
+
+    return pano_df
+    
+
 # Async function to fetch metadata
-async def fetch_metadata(session, pano_id, api_key):
+async def fetch_metadata(session, pano_id, api_key, retries=3):
     url = f"https://maps.googleapis.com/maps/api/streetview/metadata?pano={pano_id}&key={api_key}"
-    async with session.get(url) as resp:
-        return await resp.json()
+    for attempt in range(retries):
+        try:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
+                        logging.warning(f"No panorama data found for pano_id: {pano_id}")
+                        return None
+                    # Return all necessary metadata in a dictionary format for simplicity
+                    return {
+                        'Panorama_ID': pano_id,
+                        'Panorama_Date': data.get('date'),
+                        'Panorama_Latitude': data.get('location', {}).get('lat'),
+                        'Panorama_Longitude': data.get('location', {}).get('lng'),
+                        'Panorama_Rotation': data.get('heading')
+                    }
+                else:
+                    logging.warning(f"Error status {resp.status} for pano_id {pano_id}")
+        except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
+            logging.error(f"Error fetching metadata for {pano_id}: {e}")
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+    return None  # Return None if all retries fail
 
 # Async function to search panoramas and fetch metadata concurrently
 async def get_pano_metadata_async(points_coords, api_key):
     pano_data = []
-    
     async with aiohttp.ClientSession() as session:
         tasks = []
         
         for i in range(len(points_coords.geometry)):
             lat = points_coords.geometry.y[i]
             lon = points_coords.geometry.x[i]
-            
-            # Search for all available panoramic images closest to each point
             panos = search_panoramas(lat=lat, lon=lon)
             
+            if not panos:
+                logging.warning(f"No panoramas found at coordinates ({lat}, {lon})")
+                continue
+
             # Create a task to fetch metadata for each panorama found
             for pano in panos:
-                task = asyncio.ensure_future(fetch_metadata(session, pano.pano_id, api_key))
-                tasks.append((task, pano, i))
+                task = asyncio.ensure_future(fetch_metadata(session, pano.pano_id, api_key, retries=3))
+                tasks.append((task, i))
+                await asyncio.sleep(0.1)  # Delay to avoid server overload
         
-        # Run all the tasks concurrently
-        responses = await asyncio.gather(*[task for task, _, _ in tasks])
+        # Run all the tasks concurrently and process results
+        responses = await asyncio.gather(*[task for task, _ in tasks])
         
-        # Process the results
-        for (response, (_, pano, i)) in zip(responses, tasks):
-            if response.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
-                print(f"No panorama data found for pano_id: {pano.pano_id}")
-                continue
-            
-            # Assuming `get_panorama_meta` is synchronous and not CPU-heavy, you can use it here
-            meta = get_panorama_meta(pano_id=pano.pano_id, api_key=api_key)
-            
-            if meta.date:
-                date_code = datetime.strptime(meta.date, '%Y-%m')
-                
-                # Append data on point and panoramic image location
-                pano_data.append({
-                    'Point_Index': i,
-                    'Point_Latitude': points_coords.geometry.y[i],
-                    'Point_Longitude': points_coords.geometry.x[i],
-                    'Panorama_ID': pano.pano_id,
-                    'Panorama_Date': meta.date,
-                    'Panorama_Latitude': pano.lat,
-                    'Panorama_Longitude': pano.lon,
-                    'Panorama_Rotation': pano.heading
-                })
-
+        for response, (_, i) in zip(responses, tasks):
+            if response is None:
+                continue  # Skip any failed metadata fetch
+            # Append metadata to pano_data
+            pano_data.append({
+                'Point_Index': i,
+                'Point_Latitude': points_coords.geometry.y[i],
+                'Point_Longitude': points_coords.geometry.x[i],
+                **response  # Unpack metadata directly
+            })
+    
     return pd.DataFrame(pano_data)
 
 # Download panoramic images async
@@ -133,14 +249,15 @@ async def download_panoramic_images(pano_df_simple, output_path):
 
             # Attempt to download single panoramic image
             image = await get_panorama_async(pano_id=panoID, zoom = 5)
+            
+            image_cropped = crop_bottom_and_right_black_border(image)
 
             # Save the image
-            image.save(image_path, "jpeg")
+            image_cropped.save(image_path, "jpeg")
 
             print(f"Saved Panoramic Image and Metadata: ", panoID)
         except UnidentifiedImageError as e:
             print(f"Error downloading image {panoID}: {e}")
-            # Optionally, you can add a delay before retrying
             await asyncio.sleep(2)  # Wait for 2 seconds before retrying
             continue  # Skip to the next iteration of the loop
 
