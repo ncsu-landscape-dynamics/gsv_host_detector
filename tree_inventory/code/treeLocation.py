@@ -13,19 +13,27 @@
 # vancouver - coordindate - 
 # -123.105315 49.283639
 
+
+# bloomington
+# columbus
+# san jose
+
 # step one, make a new dataframe 
   
 import pandas as pd
-from EcoNameTranslator import to_scientific, to_common, to_species
 import os
 import re
 
 # folderpath for the coordinates you are taking
 folder_path = "inventory_copy_coords"
 
-
+# remove all letters and special characters from coordinates
 def cleanCoordinates(coord):
     return re.sub(r'[A-Za-z()]+', '', coord).strip()
+
+# convert the number to a string with the specified sig fits
+def truncateString(number):
+  return f"{number:.6f}" 
 
 
 # Iterate through the files
@@ -45,20 +53,19 @@ for i, filename in enumerate(os.listdir(folder_path)):
     cityDF['rounded_lat'] = cityDF['rounded_lat'].astype(float)
 
   # take only what we need and add it to a main dataframe
-  cityDF = cityDF[['rounded_lng', 'rounded_lat', 'species_name']]
+  cityDF = cityDF[['rounded_lng', 'rounded_lat', 'genus_name', 'species_name']]
 
   mainDF = pd.concat([mainDF, cityDF], ignore_index=True)
 
-mainDF['rounded_lng'] = mainDF['rounded_lng'].round(6)
-mainDF['rounded_lat'] = mainDF['rounded_lat'].round(6)
-
+mainDF['rounded_lng'] = mainDF['rounded_lng'].apply(truncateString)
+mainDF['rounded_lat'] = mainDF['rounded_lat'].apply(truncateString)
 # Change this for the path of the AutoArborist 
-AAPath =  "tree_locations/tree_locations_tfrecord_idx_merged_subset_4dl.csv"
-AADF = cityDF = pd.read_csv(AAPath)
+AAPath =  "tree_locations/tree_locations_tfrecord_idx_merged.csv"
+AADF  = pd.read_csv(AAPath)
 
-AADF['rounded_lng'] = AADF['rounded_lng'].round(6)
-AADF['rounded_lat'] = AADF['rounded_lat'].round(6)
-AADF = pd.merge(AADF, mainDF[['rounded_lng', 'rounded_lat', 'species_name']], 
+AADF['rounded_lng'] = AADF['rounded_lng'].apply(truncateString)
+AADF['rounded_lat'] = AADF['rounded_lat'].apply(truncateString)
+AADF = pd.merge(AADF, mainDF[['rounded_lng', 'rounded_lat', 'genus_name', 'species_name']], 
                     on=['rounded_lng', 'rounded_lat'], 
                     how='left')
 filename = "AutoArboristData.csv"
