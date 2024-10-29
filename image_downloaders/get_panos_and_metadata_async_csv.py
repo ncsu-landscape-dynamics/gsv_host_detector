@@ -154,69 +154,6 @@ def remove_adjacent_panoramics(pano_df, distance):
     return pano_df
     
 
-# Async function to fetch metadata
-async def fetch_metadata(session, pano_id, api_key, retries=3):
-    url = f"https://maps.googleapis.com/maps/api/streetview/metadata?pano={pano_id}&key={api_key}"
-    for attempt in range(retries):
-        try:
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
-                        logging.warning(f"No panorama data found for pano_id: {pano_id}")
-                        return None
-                    # Return all necessary metadata in a dictionary format for simplicity
-                    return {
-                        'Panorama_ID': pano_id,
-                        'Panorama_Date': data.get('date'),
-                        'Panorama_Latitude': data.get('location', {}).get('lat'),
-                        'Panorama_Longitude': data.get('location', {}).get('lng'),
-                        'Panorama_Rotation': data.get('heading')
-                    }
-                else:
-                    logging.warning(f"Error status {resp.status} for pano_id {pano_id}")
-        except (aiohttp.ClientConnectorError, asyncio.TimeoutError) as e:
-            logging.error(f"Error fetching metadata for {pano_id}: {e}")
-            await asyncio.sleep(2 ** attempt)  # Exponential backoff
-    return None  # Return None if all retries fail
-
-# Async function to search panoramas and fetch metadata concurrently
-async def get_pano_metadata_async(points_coords, api_key):
-    pano_data = []
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        
-        for i in range(len(points_coords.geometry)):
-            lat = points_coords.geometry.y[i]
-            lon = points_coords.geometry.x[i]
-            panos = search_panoramas(lat=lat, lon=lon)
-            
-            if not panos:
-                logging.warning(f"No panoramas found at coordinates ({lat}, {lon})")
-                continue
-
-            # Create a task to fetch metadata for each panorama found
-            for pano in panos:
-                task = asyncio.ensure_future(fetch_metadata(session, pano.pano_id, api_key, retries=3))
-                tasks.append((task, i))
-                await asyncio.sleep(0.1)  # Delay to avoid server overload
-        
-        # Run all the tasks concurrently and process results
-        responses = await asyncio.gather(*[task for task, _ in tasks])
-        
-        for response, (_, i) in zip(responses, tasks):
-            if response is None:
-                continue  # Skip any failed metadata fetch
-            # Append metadata to pano_data
-            pano_data.append({
-                'Point_Index': i,
-                'Point_Latitude': points_coords.geometry.y[i],
-                'Point_Longitude': points_coords.geometry.x[i],
-                **response  # Unpack metadata directly
-            })
-    
-    return pd.DataFrame(pano_data)
-
 # Download panoramic images async
 async def download_panoramic_images(pano_df_simple, output_path):
     for i in tqdm(range(len(pano_df_simple))):
@@ -304,7 +241,45 @@ def main():
 
     logging.info("Finding Panoramic Images Near Road Points")
     
-    pano_df = asyncio.run(get_pano_metadata_async(points_coords, api_key))
+    pano_data = []
+
+    # Iterate over each point in the road network, and get metadata for the nearest panoramic images
+    for i in tqdm(range(len(points_coords.geometry))):
+
+        # Search for all available panoramic images closest to each point
+        panos = search_panoramas(lat=points_coords.geometry.y[i], lon=points_coords.geometry.x[i])
+
+        # Iterate through the closest set of panos for a given location
+        # For each pano image, get the metadata by supplying the unique pano_id string
+        for pano in panos:
+
+            # Fetch metadata
+            resp = requests.get(f"https://maps.googleapis.com/maps/api/streetview/metadata?pano={pano.pano_id}&key={api_key}")
+            meta_data = resp.json()
+
+            # Check if metadata is valid or if the status is ZERO_RESULTS
+            if meta_data.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
+                print(f"No panorama data found for pano_id: {pano.pano_id}")
+                continue  # Skip to the next panorama if no data is found
+
+            meta = get_panorama_meta(pano_id=pano.pano_id, api_key=api_key)
+
+            if meta.date:
+                date_code = datetime.strptime(meta.date, '%Y-%m')
+
+                # Append data on point and panoramic image location
+                pano_data.append({'Point_Index': i,
+                    'Point_Latitude': points_coords.geometry.y[i],
+                    'Point_Longitude': points_coords.geometry.x[i],
+                    'Panorama_ID': pano.pano_id,
+                    'Panorama_Date': meta.date,
+                    'Panorama_Latitude': pano.lat,
+                    'Panorama_Longitude': pano.lon,
+                    'Panorama_Rotation': pano.heading})
+
+
+    # All available panoramic images sampled from road points
+    pano_df = pd.DataFrame(pano_data)
     
     # Save pano_df
     pano_df_output_path = os.path.join(output_path, 'panoramic_images_metadata.csv')
