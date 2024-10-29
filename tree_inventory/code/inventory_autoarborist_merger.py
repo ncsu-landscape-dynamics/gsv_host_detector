@@ -60,7 +60,7 @@ for i, filename in enumerate(os.listdir(folder_path)):
 mainDF['rounded_lng'] = mainDF['rounded_lng'].apply(truncateString)
 mainDF['rounded_lat'] = mainDF['rounded_lat'].apply(truncateString)
 # Change this for the path of the AutoArborist 
-AAPath =  "tree_locations/tree_locations_tfrecord_idx_merged.csv"
+AAPath =  "og_autoarborist /tree_locations_tfrecord_idx_merged.csv"
 AADF  = pd.read_csv(AAPath)
 
 AADF['rounded_lng'] = AADF['rounded_lng'].apply(truncateString)
@@ -68,5 +68,6 @@ AADF['rounded_lat'] = AADF['rounded_lat'].apply(truncateString)
 AADF = pd.merge(AADF, mainDF[['rounded_lng', 'rounded_lat', 'genus_name', 'species_name']], 
                     on=['rounded_lng', 'rounded_lat'], 
                     how='left')
+AADF = AADF[[]]
 filename = "AutoArboristData.csv"
-AADF.to_csv('tree_locations/' + filename, index=False)
+AADF.to_csv('autoarborist_names_appended/' + filename, index=False)

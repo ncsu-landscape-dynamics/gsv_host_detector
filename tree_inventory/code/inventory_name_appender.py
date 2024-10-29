@@ -129,16 +129,16 @@ def handleNA(value):
 # Get city and create columns
 
 # Find the folder path and create a dataframe from it
-folder_path = "../tree_inventories_original_records"
-currentCities = {"columbus_inventory.csv"}
+folder_path = "/og_inventories"
+# currentCities = {"columbus_inventory.csv"}
 usdaDF = pd.read_csv(os.path.join(folder_path, 'usda_code.csv'), on_bad_lines='skip')
 print(usdaDF.columns.tolist())
 # Iterate through the files
 for i, filename in enumerate(os.listdir(folder_path)):
     if filename == 'usda_code.csv':
         continue
-    if filename not in currentCities:
-        continue
+    # if filename not in currentCities:
+    #     continue
     iterations = 1
     print(filename)
     print("FILE #", i)
@@ -218,5 +218,5 @@ for i, filename in enumerate(os.listdir(folder_path)):
 
     # cleaned_df = cleaned_df[~((cleaned_df['unique_common_name'] == 'NA') & cleaned_df['unique_sciname'].duplicated(keep=False))]
 
-    cityDF.to_csv('inventory_copy/' + filename, index=False)
+    cityDF.to_csv('og_inventories_w_names_appended/' + filename, index=False)
 
