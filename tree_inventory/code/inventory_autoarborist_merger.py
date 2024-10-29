@@ -25,7 +25,7 @@ import os
 import re
 
 # folderpath for the coordinates you are taking
-folder_path = "inventory_copy_coords"
+folder_path = "og_inventories_w_names_coords"
 
 # remove all letters and special characters from coordinates
 def cleanCoordinates(coord):
