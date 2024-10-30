@@ -34,10 +34,10 @@ import osmnx as ox
 # Imports for Google Street View Image downloader
 # https://github.com/robolyst/streetview/tree/master
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from requests.models import Response
 import re
-from streetview import get_panorama_meta, get_streetview, get_panorama, get_panorama_async
+from streetview import get_panorama_async
 
 
 # Set up logging
@@ -58,6 +58,39 @@ class Panorama(BaseModel):
     roll: Optional[float]
     date: Optional[str]
     elevation: Optional[float]
+
+class Location(BaseModel):
+    lat: float
+    lng: float
+
+class MetaData(BaseModel):
+    date: Optional[str]
+    location: Location
+    pano_id: str
+    copyright: str
+
+def get_panorama_meta(pano_id: str, api_key: str) -> Optional[MetaData]:
+    """
+    Returns a panorama's metadata.
+
+    Quota: This function doesn't use up any quota or charge on your API_KEY.
+
+    Endpoint documented at:
+    https://developers.google.com/maps/documentation/streetview/metadata
+    """
+    url = (
+        "https://maps.googleapis.com/maps/api/streetview/metadata"
+        f"?pano={pano_id}&key={api_key}"
+    )
+    resp = requests.get(url)
+    resp_data = resp.json()
+
+    # Now create the MetaData object safely
+    try:
+        return MetaData(**resp_data)
+    except ValidationError as e:
+        print(f"Validation Error for pano_id {pano_id}: {e}")
+        return None  # Return None if validation fails
 
 def search_panoramas(lat: float, lon: float) -> List[Panorama]:
     """
@@ -343,37 +376,32 @@ def main():
 
     # Iterate over each point in the road network, and get metadata for the nearest panoramic images
     for i in tqdm(range(len(points_coords.geometry))):
-
         # Search for all available panoramic images closest to each point
         panos = search_panoramas(lat=points_coords.geometry.y[i], lon=points_coords.geometry.x[i])
 
-        # Iterate through the closest set of panos for a given location
-        # For each pano image, get the metadata by supplying the unique pano_id string
         for pano in panos:
-
             # Fetch metadata
-            resp = requests.get(f"https://maps.googleapis.com/maps/api/streetview/metadata?pano={pano.pano_id}&key={api_key}")
-            meta_data = resp.json()
-
-            # Check if metadata is valid or if the status is ZERO_RESULTS
-            if meta_data.get('status') in ['ZERO_RESULTS', 'UNKNOWN_ERROR', 'NOT_FOUND', 'DATA_NOT_AVAILABLE']:
-                print(f"No panorama data found for pano_id: {pano.pano_id}")
-                continue  # Skip to the next panorama if no data is found
-
             meta = get_panorama_meta(pano_id=pano.pano_id, api_key=api_key)
+            
+            # Ensure meta is valid before proceeding
+            if meta is None:
+                print(f"Skipping pano_id {pano.pano_id} due to missing metadata.")
+                continue
 
             if meta.date:
                 date_code = datetime.strptime(meta.date, '%Y-%m')
 
                 # Append data on point and panoramic image location
-                pano_data.append({'Point_Index': i,
+                pano_data.append({
+                    'Point_Index': i,
                     'Point_Latitude': points_coords.geometry.y[i],
                     'Point_Longitude': points_coords.geometry.x[i],
                     'Panorama_ID': pano.pano_id,
                     'Panorama_Date': meta.date,
                     'Panorama_Latitude': pano.lat,
                     'Panorama_Longitude': pano.lon,
-                    'Panorama_Rotation': pano.heading})
+                    'Panorama_Rotation': pano.heading
+                })
 
 
     # All available panoramic images sampled from road points
