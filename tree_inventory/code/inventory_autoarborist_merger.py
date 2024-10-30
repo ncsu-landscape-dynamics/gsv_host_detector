@@ -25,7 +25,11 @@ import os
 import re
 
 # folderpath for the coordinates you are taking
-folder_path = "og_inventories_w_names_coords"
+folder_path = "G:/Shared drives/host_tree_cnn/merging_autoarborist_w_inventories/og_inventories_w_names_coords/"
+if os.path.exists(folder_path) and os.path.isdir(folder_path):
+    print("Folder exists.")
+else:
+    print("Folder does not exist or the path is incorrect.")
 
 # remove all letters and special characters from coordinates
 def cleanCoordinates(coord):
@@ -46,7 +50,7 @@ for i, filename in enumerate(os.listdir(folder_path)):
 
   # do string operations for incorrect formatting
   if not {'rounded_lng', 'rounded_lat'}.issubset(cityDF.columns):
-    cityDF['coordinates'] = cityDF['coordinates'].astype(str)
+    cityDF['coordinates'] = cityDF['coordinate'].astype(str)
     cityDF['coordinates'] = cityDF['coordinates'].apply(cleanCoordinates)
     cityDF[['rounded_lng', 'rounded_lat']] = cityDF['coordinates'].str.split(expand=True)
     cityDF['rounded_lng'] = cityDF['rounded_lng'].astype(float)
@@ -60,7 +64,7 @@ for i, filename in enumerate(os.listdir(folder_path)):
 mainDF['rounded_lng'] = mainDF['rounded_lng'].apply(truncateString)
 mainDF['rounded_lat'] = mainDF['rounded_lat'].apply(truncateString)
 # Change this for the path of the AutoArborist 
-AAPath =  "og_autoarborist /tree_locations_tfrecord_idx_merged.csv"
+AAPath =  "G:/Shared drives/host_tree_cnn/merging_autoarborist_w_inventories/og_autoarborist/tree_locations_tfrecord_idx_merged.csv"
 AADF  = pd.read_csv(AAPath)
 
 AADF['rounded_lng'] = AADF['rounded_lng'].apply(truncateString)
@@ -68,6 +72,5 @@ AADF['rounded_lat'] = AADF['rounded_lat'].apply(truncateString)
 AADF = pd.merge(AADF, mainDF[['rounded_lng', 'rounded_lat', 'genus_name', 'species_name']], 
                     on=['rounded_lng', 'rounded_lat'], 
                     how='left')
-AADF = AADF[[]]
 filename = "AutoArboristData.csv"
-AADF.to_csv('autoarborist_names_appended/' + filename, index=False)
+AADF.to_csv('G:/Shared drives/host_tree_cnn/merging_autoarborist_w_inventories/autoarborist_names_appended/' + filename, index=False)

@@ -129,9 +129,9 @@ def handleNA(value):
 # Get city and create columns
 
 # Find the folder path and create a dataframe from it
-folder_path = "/og_inventories"
+folder_path = "G:/Shared drives/host_tree_cnn/cleaning_species_names/og_inventories_modified_labels"
 # currentCities = {"columbus_inventory.csv"}
-usdaDF = pd.read_csv(os.path.join(folder_path, 'usda_code.csv'), on_bad_lines='skip')
+usdaDF = pd.read_csv('G:/Shared drives/host_tree_cnn/cleaning_species_names/addl_data/usda_code.txt', on_bad_lines='skip')
 print(usdaDF.columns.tolist())
 # Iterate through the files
 for i, filename in enumerate(os.listdir(folder_path)):
@@ -177,7 +177,8 @@ for i, filename in enumerate(os.listdir(folder_path)):
     cityDF['unique_common_name'] = cityDF['common_name'].astype(str)
 
     # In case you need to get scientific names from ecotranslator
-    # cityDF['species_name'] = cityDF['unique_common_name'].apply(getScientificNames)
+    if filename == 'bloomington_inventory.csv':
+      cityDF['species_name'] = cityDF['unique_common_name'].apply(getScientificNames)
 
     cityDF['unique_sciname'] = cityDF['species_name'].astype(str)
 
@@ -210,13 +211,12 @@ for i, filename in enumerate(os.listdir(folder_path)):
 
     # no longer need to handle duplicates
     # Ensure all spaces are the same
-    # cityDF = cityDF.apply(lambda x: x.str.replace('\xa0', ' ', regex=True) if x.dtype == "object" else x)
+    # cityDF = cityDF.apply(lambda x: x.str.replace('/xa0', ' ', regex=True) if x.dtype == "object" else x)
 
     # handle duplicates, including NA duplicates = longer need to drop dupliacates
     # cleaned_df = cityDF.drop_duplicates()
     # cleaned_df = cleaned_df[~((cleaned_df['unique_sciname'] == 'NA') & cleaned_df['unique_common_name'].duplicated(keep=False))]
 
     # cleaned_df = cleaned_df[~((cleaned_df['unique_common_name'] == 'NA') & cleaned_df['unique_sciname'].duplicated(keep=False))]
-
-    cityDF.to_csv('og_inventories_w_names_appended/' + filename, index=False)
+    cityDF.to_csv("G:/Shared drives/host_tree_cnn/cleaning_species_names/og_inventories_w_names_appended/" + filename, index=False)
 
