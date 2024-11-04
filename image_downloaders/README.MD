@@ -1,6 +1,6 @@
 # Image Downloading
 
-The `image_downloaders` module provides scripts for downloading image dat for training and evaluating a Convolutional Neural Network (CNN).
+The `image_downloaders` module provides scripts for downloading image data.
 
 ## Folder Structure
 
