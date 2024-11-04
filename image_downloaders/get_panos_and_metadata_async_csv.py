@@ -82,8 +82,16 @@ def get_panorama_meta(pano_id: str, api_key: str) -> Optional[MetaData]:
         "https://maps.googleapis.com/maps/api/streetview/metadata"
         f"?pano={pano_id}&key={api_key}"
     )
-    resp = requests.get(url)
-    resp_data = resp.json()
+    try:
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status() # Raise an exception for bad status codes
+    except requests.exceptions.ReadTimeout:
+        print("Timeout occurred while reading data from the server.")
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+    else:
+        # Process the response if no exception occurs
+        resp_data = resp.json()
 
     # Now create the MetaData object safely
     try:
