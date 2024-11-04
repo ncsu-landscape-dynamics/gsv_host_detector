@@ -1,5 +1,0 @@
-{
-    "api_key_path": "Z:\\auto_arborist_cvpr2022_v0.15\\api_keys\\Google_Street_View_Static_API_Key_Private_LakeT.txt",
-	"gpkg_roads_file": "C:\\Users\\talake2\\Desktop\\tree-geolocation-exp\\open_street_maps_city_roads_autoarborist_test_splits\\kitchener_ontario_testing_road_network.gpkg"
-	"output_path": "C:\\Users\\talake2\\Desktop\\tree-geolocation-exp\\geolocation-panos-testing-cities\\geolocation-panos-testing-kitchener"
-}
