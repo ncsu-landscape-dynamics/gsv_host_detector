@@ -4,8 +4,6 @@
 # Imports
 
 import torch
-
-import torch
 from torchvision import transforms
 import os
 import sys
