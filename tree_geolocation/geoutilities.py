@@ -312,17 +312,17 @@ def process_image(img_folder: str, img_name: str, tree_model: torch.nn.Module, z
         # Save predicted image
         crop_img = img[ymin:ymax, xmin:xmax, ...]
         # Define the directory and file path
-        save_dir = f"C:/users/talake2/Desktop/tree-geolocation-exp/siouxfalls_predictions_genus/predicted_{predicted_genus}/"
-        filename = f"{save_dir}{pano_id}-{index}.jpg"
+        #save_dir = f"C:/users/talake2/Desktop/tree-geolocation-exp/siouxfalls_predictions_genus/predicted_{predicted_genus}/"
+        #filename = f"{save_dir}{pano_id}-{index}.jpg"
         
         # Check if the directory exists, if not, create it
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+        #if not os.path.exists(save_dir):
+        #    os.makedirs(save_dir)
         
         # Save the cropped image
-        plt.imshow(crop_img)
-        plt.savefig(filename)
-        plt.close()
+        #plt.imshow(crop_img)
+        #plt.savefig(filename)
+        #plt.close()
 
         # Crop the depth map to the tree matched from panoramic image to inventory
         cropped_depth = metric_depth_resized_zoe[ymin:ymax, xmin:xmax]
