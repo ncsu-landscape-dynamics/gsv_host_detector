@@ -87,8 +87,10 @@ def get_panorama_meta(pano_id: str, api_key: str) -> Optional[MetaData]:
         resp.raise_for_status() # Raise an exception for bad status codes
     except requests.exceptions.ReadTimeout:
         print("Timeout occurred while reading data from the server.")
+        return None
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
+        return None
     else:
         # Process the response if no exception occurs
         resp_data = resp.json()
