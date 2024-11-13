@@ -4,7 +4,7 @@
 Ex in Bash; export PYTHONPATH=$PYTHONPATH:/c/users/talake2/desktop/gsv_host_detector
 
 # Load Conda Environment
-source activate ox
+source activate gsv_downloader
 
 # Inspect config.json file to specify downloading parameters
 
@@ -19,4 +19,4 @@ source activate ox
 
 
 # Run Get_GSV_Panos_API.py to geolocate trees
-python -m image_downloaders.get_panos.api --config "C:\Users\talake2\Desktop\image_downloaders\config.json"
+python -m image_downloaders.get_panos_and_metadata_async --config "C:\Users\talake2\Desktop\image_downloaders\downloader_config_csv.json"

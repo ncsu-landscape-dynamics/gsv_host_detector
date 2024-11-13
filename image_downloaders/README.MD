@@ -1,10 +1,32 @@
-The following repo contains R and Python scripts to download images from several sources.
+# Image Downloading
 
-The inat_img_dler.R script downloads images from iNaturalist, focusing on host tree genera.
+The `image_downloaders` module provides scripts for downloading image data.
 
-The Get_GSV_Panos_API.ipynb Python notebook downloads images from Google Street View given a user-specified location.
+## Folder Structure
 
-The Get_GSV_Panos_OSMnx.ipynb Python notebook adds functionality to download inages from Google Street View along user-defined road networks using the OSMnx package.
+In `/image_downloaders`, you will find Python scripts for configuring and downloading GSV images.
 
+- **get_panos_and_metadata_async_csv.py**: Script for downloading GSV images.
+- **downloader_config_csv.json**: Configuration file for downloading GSV images.
+- **tiny_25m_near_samples.csv**: CSV file of points along roads to download GSV images.
+- **osmnx_functions.py**: Script with functions for working with OpenStreetMaps roads data.
 
+In the `/r_scripts` directory, you will find the following key scripts and configurations:
 
+- **eddmaps_img_dler.R**: Script for downloading images from EddMaps.
+- **inat_img_dler.R**: Script for downloading images from iNaturalist.
+
+## Usage for GSV Downloader
+
+### 1. Export Python Path
+Ensure the Python path is set to the parent directory of the `image_downloaders` folder. For example:
+export PYTHONPATH=$PYTHONPATH:/path/to/parent_directory
+
+### 2. Activate Conda Environment
+source activate my_env
+
+### 3. Modify Config File
+Specify experiment name, path to API key, and locations for downloading.
+
+### 3. Run the downloader
+python -m image_downloaders.get_panos_and_metadata_async_csv --config "/path/to/train_config.json"

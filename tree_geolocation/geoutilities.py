@@ -4,8 +4,6 @@
 # Imports
 
 import torch
-
-import torch
 from torchvision import transforms
 import os
 import sys
@@ -289,7 +287,7 @@ def process_image(img_folder: str, img_name: str, tree_model: torch.nn.Module, z
     model_results_df = model_results.pandas().xyxy[0] 
     
     # Subset trees from YOLO model by detection heuristics: bounding box size, aspect ratio, confidence
-    top_detection_results = process_yolo_results(model_results_df, 6) # Select top N detections by area, aspect ratio, and confidence
+    top_detection_results = process_yolo_results(model_results_df, 3) # Select top N detections by area, aspect ratio, and confidence
     logging.info(top_detection_results)
 
     if top_detection_results is None:
@@ -310,8 +308,16 @@ def process_image(img_folder: str, img_name: str, tree_model: torch.nn.Module, z
         predicted_genus, genus_softmax_dict = predict_genus_cnn(img, classifier, selected_genera, xmin, ymin, xmax, ymax)
 
         # Save predicted image
-        #crop_img = img[ymin:ymax, xmin:xmax, ...]
-        #filename = f"C:/users/talake2/Desktop/tree-geolocation-exp/prediction-images/{predicted_genus}-{pano_id}-{index}.jpg"
+        crop_img = img[ymin:ymax, xmin:xmax, ...]
+        # Define the directory and file path
+        #save_dir = f"C:/users/talake2/Desktop/tree-geolocation-exp/siouxfalls_predictions_genus/predicted_{predicted_genus}/"
+        #filename = f"{save_dir}{pano_id}-{index}.jpg"
+        
+        # Check if the directory exists, if not, create it
+        #if not os.path.exists(save_dir):
+        #    os.makedirs(save_dir)
+        
+        # Save the cropped image
         #plt.imshow(crop_img)
         #plt.savefig(filename)
         #plt.close()
@@ -459,7 +465,7 @@ def filter_intersections(triangulated_tree_detections_gdf, tree_points_kdtree, m
     filtered_intersection_geometry = [Point(xy) for xy in filtered_tree_detections_gdf['Intersection']]
     filtered_triangulated_tree_detections_gdf = gpd.GeoDataFrame(filtered_tree_detections_gdf, geometry=filtered_intersection_geometry, crs="EPSG:4326")
     
-    predicted_classes = filtered_triangulated_tree_detections_gdf.iloc[:, 9:34].idxmax(axis=1)
+    predicted_classes = filtered_triangulated_tree_detections_gdf.iloc[:, 9:109].idxmax(axis=1)
     predicted_classes = predicted_classes.apply(lambda x: x.split('_')[0])
     filtered_triangulated_tree_detections_gdf['predicted_genus'] = predicted_classes
     
