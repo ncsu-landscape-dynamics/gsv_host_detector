@@ -2,7 +2,14 @@ import pandas as pd
 from EcoNameTranslator import to_scientific, to_common, to_species
 import os
 import csv
+from pytaxize import scicomm
+from pygbif import species
+usdaDF = pd.read_csv('G:/Shared drives/host_tree_cnn/cleaning_species_names/addl_data/usda_code.txt')
+print(usdaDF.columns.tolist())
+usdaDF['Scientific Name with Author'] = usdaDF['Scientific Name with Author'].str.lower()
+usdaDF['Common Name'] = usdaDF['Common Name'].str.lower()
 
+# ['Symbol', 'Synonym Symbol', 'Scientific Name with Author', 'Common Name', 'Family']
 prevFindings = {}
 # clean up the scientific names
 def cleanScientific(scientificName):
@@ -60,6 +67,8 @@ def getCommonNames(scientificName):
 
 # common name to scientific Name
 i = 0
+print(usdaDF.columns.tolist())
+# ['Symbol', 'Synonym Symbol', 'Scientific Name with Author', 'Common Name', 'Family']
 noneCount = 0
 cNaValues = set()
 common_namesDict = {}
@@ -69,23 +78,57 @@ def getScientificNames(common_name):
     global cNaValues
     # if i % 100 == 0:
     #     print(i)
+    common_name = common_name.lower()
+    print(common_name)
+
     i += 1
     if common_name in cNaValues:
         noneCount += 1
         return None
     elif common_name in common_namesDict:
+        print(common_namesDict[common_name])
         return common_namesDict[common_name]
     try:
-        common_names = to_scientific([common_name])[common_name][1][0]
-        if len(common_names) == 0:
+        sci_name = to_scientific([common_name])[common_name][1]
+        if len(sci_name) == 0:
             raise ValueError()
         
-        common_namesDict[common_name] = common_names[0]
-        return common_names
+        common_namesDict[common_name] = sci_name[0]
+        print(sci_name[0])
+        return sci_name[0]
     except:
-        noneCount += 1 
-        cNaValues.add(common_name)
-        return "NA"
+      result = usdaDF.loc[usdaDF['Common Name'] == common_name, 'Scientific Name with Author'].values
+      if len(result) > 0:
+          print("RESULT")
+          print(result[0])
+          common_namesDict[common_name] = result[0]
+          return result[0]
+
+      print("NONE")
+      noneCount += 1 
+      cNaValues.add(common_name)
+      return "NA"
+
+        # result = species.name_suggest(common_name)
+        # print(result)
+        # if True:
+        #   result = scicomm.sci2comm(common_name, db="itis")[common_name][0]
+        #   print(result)
+        #   thing = species.name_suggest(result)
+        #   print(thing)
+        # # except:
+        #     print("fail")
+        # if result:
+        #     sci_name = result[0]['scientificName']
+        #     if len(sci_name) == 0:
+        #         raise ValueError()
+        #     print(sci_name[0])
+        #     common_namesDict[common_name] = sci_name[0]
+        #     return sci_name
+
+        # else:
+        #     raise ValueError()
+      # except:
 
 # reverse comma ordering
 def reorganizeComma(name):
@@ -131,11 +174,12 @@ def handleNA(value):
 # Find the folder path and create a dataframe from it
 folder_path = "G:/Shared drives/host_tree_cnn/cleaning_species_names/og_inventories_modified_labels"
 # currentCities = {"columbus_inventory.csv"}
-usdaDF = pd.read_csv('G:/Shared drives/host_tree_cnn/cleaning_species_names/addl_data/usda_code.txt', on_bad_lines='skip')
-print(usdaDF.columns.tolist())
 # Iterate through the files
+
 for i, filename in enumerate(os.listdir(folder_path)):
     if filename == 'usda_code.csv':
+        continue
+    if filename != 'columbus_inventory.csv':
         continue
     # if filename not in currentCities:
     #     continue
@@ -172,14 +216,22 @@ for i, filename in enumerate(os.listdir(folder_path)):
 
         cityDF['common_name'] = cityDF['SP_CODE'].map(commonDict)
         cityDF['species_name'] = cityDF['SP_CODE'].map(sciDict)
+        print(cityDF['common_name'])
+        na_percentage = cityDF['common_name'].isna().mean() * 100
+        print(f"Percentage of NaN values in 'common_name': {na_percentage:.2f}%")
+
+        na_percentage = cityDF['species_name'].isna().mean() * 100
+        print(f"Percentage of NaN values in 'species_name': {na_percentage:.2f}%")
+
     # Drop all na values and format the table to a string
     # cityDF.dropna(how='all')
     cityDF['unique_common_name'] = cityDF['common_name'].astype(str)
 
     # In case you need to get scientific names from ecotranslator
     if filename == 'bloomington_inventory.csv':
+      print(cityDF[['unique_common_name']])
       cityDF['species_name'] = cityDF['unique_common_name'].apply(getScientificNames)
-
+      print(cityDF)
     cityDF['unique_sciname'] = cityDF['species_name'].astype(str)
 
     # handle space removal and lowercase conversion
