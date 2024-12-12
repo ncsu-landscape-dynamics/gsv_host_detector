@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Thomas Lake
+# Bash script to check if all files in a directory are of a specific type
+
 # Base directory containing your training folders
-base_dir="/usr/local/usrapps/rkmeente/talake2/pytorch_env/training_dataset_small_march624"
+base_dir="/my_image_directory/"
 
 # Output file to store the list of non-jpg/jpeg files
 output_file="non_jpg_files.txt"
