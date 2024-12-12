@@ -1,6 +1,6 @@
 # Host Tree Geolocation Module
 
-# Thomas Lake June 2024
+# Thomas Lake December 2024
 
 # Imports
 
@@ -60,7 +60,7 @@ def main():
     yolo_model_path = config['yolo_model_path']
     classifier_path = config['classifier_path']
     selected_genera = config['selected_genera']
-
+    
     # Sort genera alphabetically
     selected_genera = sorted(selected_genera)
 
