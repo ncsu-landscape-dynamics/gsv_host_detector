@@ -6,15 +6,18 @@ The `tree_classification` module provides scripts for preprocessing data, traini
 
 In the `/tree_classification` directory, you will find the following key scripts and configurations:
 
-- **preprocess.py**: Scripts for data preprocessing.
-- **train.py**: Script for training the CNN model.
-- **evaluate.py**: Script for evaluating the trained model.
-- **models.py**: Contains model architectures.
-- **utilities.py**: Utility functions used across different scripts.
-- **train_config.json**: Configuration file for training parameters.
-- **eval_config.json**: Configuration file for evaluation parameters.
+- **preprocess.py**: For data preprocessing, creating training and testing datasets, and combining images across datasets.
+- **train.py**: For training the CNN image classification model.
+- **evaluate.py**: For evaluating a trained CNN on a testing dataset.
+- **models.py**: Contains model architectures for EfficientNet and helper functions.
+- **utilities.py**: Functions to calculate summary statistics for images.
+- **train_config.json**: Configuration file for training the image classification models.
+- **eval_config.json**: Configuration file for evaluating the image classification models.
+- **iNaturalist_Image_Filtering_CLIP_hpc.py**: Python script to run contrastive language image pretraining (CLIP) on iNaturalist images.
+- **image_checks.sh**: Script to identify non-jpg and non-jpeg images.
+- **weights_100_genera.txt**: Experimental weights to adjust loss function while training CNNs.
 
-Note: files with *hpc are for running on a high performance compute cluster.
+Notes: files named with *_hpc are for running on a high performance compute (HPC) cluster. These files also have accompanying .sh scripts to submit HPC jobs.
 
 ## Usage
 
