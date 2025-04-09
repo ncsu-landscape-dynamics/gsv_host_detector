@@ -12,4 +12,4 @@ In the '/tree_detection' directory, you will find the following files and data:
 - **hyp-scratch-custom.yaml**: YOLOv5x model training hyperparametrs and augmentations.
 - **training_arguments_command_line**: Arguments for training the YOLOv5x models via command line.
 
-# Note: For the trained YOLOv5x model weights, please contact the authors.
+Note: For the trained YOLOv5x model weights, please contact the authors.
