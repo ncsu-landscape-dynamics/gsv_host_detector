@@ -9,3 +9,16 @@ The 'tree_geolocation' module provides Python scripts to apply tree object detec
 - **geoutilities.py**: Python function library to load models, process imagery, apply model predictions, and geolocate trees.
 - **/jupyter_notebooks**: Notebooks to experiment with tree geolocation workflows.
 
+# Usage
+
+# Export Python Path to Parent Directory of Tree_Geolocation Folder
+Ex in Bash; export PYTHONPATH=$PYTHONPATH:/path/to/parent/directory
+
+# Load Conda Environment with Torch
+source activate my_env
+
+# Inspect geolocation_config.json File to Specify Training Parameters
+
+# Run Train.py to Train CNN
+python -m tree_geolocation.geolocate --config "path\to\geolocation_config.json"
+
