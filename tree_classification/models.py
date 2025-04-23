@@ -207,7 +207,7 @@ def fit(epochs, lr, model, train_loader, val_loader, optimizer,
             early_stopping_counter += 1
             if early_stopping_counter >= es_patience:
                 print(f"Early stopping triggered after {es_patience} consecutive epochs of no improvement.")
-                save_checkpoint(model, epoch, outpath)
+                save_checkpoint(model, epoch, optimizer, outpath)
                 break
         
     return history
